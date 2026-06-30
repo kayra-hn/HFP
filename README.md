@@ -1,7 +1,4 @@
-# Infiniti Artificial Consciousness (IAC)
-### Powered by Hyper Flux Projection (HFP) Causal Language Model
-
-*Note: The three "i"s in **Infiniti** deliberately symbolize the three-tiered memory structure of the model: Short, Mid, and Long memory states.*
+# Hyper Flux Projection (HFP) Causal Language Model
 
 HFP (Hyper Flux Projection) is a novel, physics-inspired neural network architecture designed for causal language modeling. It introduces advanced physics concepts into the standard Transformer architecture and optimization process, aiming to achieve more stable, coherent, and physically-grounded learning trajectories.
 
