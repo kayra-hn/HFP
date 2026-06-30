@@ -19,10 +19,11 @@ The core model, `HFPForCausalLM` (~124M parameters), structurally maps to a stan
 ### 1. Thermodynamic Context Compression (`bulk_trigger_decoder`)
 Unlike continuous linear attention (e.g., Google's Infini-attention) which blindly compresses data, HFP employs an **active thermodynamic trigger**. The short-term memory is constantly evaluated for its **Entropy** and **Curvature**. Once the entropy of the current cognitive state reaches a saturation threshold, the `bulk_trigger` activates, compressing the local context into a high-dimensional `bulk_state` (Long-term memory). This prevents context dilution and catastrophic forgetting while drastically reducing the $O(N^2)$ attention bottlenecks.
 
-### 2. Physics-Informed Internal State (`hfp_bulk_state`)
+### 2. Physics-Informed Internal State (`hfp_bulk_state` & `hfp_utils`)
 The architecture introduces several non-standard tracking variables directly influenced by physical laws:
-- **Entropy Maps:** Tracks the chaos/stability of the attention gates, emitting warnings (`Low coherence detected`) if the cognitive space degrades.
-- **Curvature:** Measures the geometric distortion of the vector space to prevent gradient vanishing/exploding.
+- **5D Radial Curvature:** Unlike standard models that only measure temporal change, HFP measures the second derivative across its *memory depth* (Short -> Medium -> Long). It calculates a Ricci-scalar proxy to regulate the internal "gravity" of the context window.
+- **Witten Boundary-to-Bulk Propagator:** The transition of information from short-term memory (Boundary) to long-term memory (Bulk) is not linear. It is modulated by a warp factor $e^{-k \cdot S}$ based on the entropy (chaos) of the boundary, physically shielding the deep bulk from noisy inputs.
+- **Ryu-Takayanagi Entropy Bound:** Inspired by the holographic entanglement entropy formula, the model enforces a strict mathematical bound: the entropy of the boundary cannot exceed the surface area of the bulk. If the model approaches hallucination, a ReLU penalty restricts the gradients.
 - **Conservation Checks:** Enforces mathematical conservation laws across hidden states to ensure the model doesn't hallucinate context shifts out of thin air.
 
 ### 3. Quantum-Inspired Schedulers (`physics_optimizers.py`)
