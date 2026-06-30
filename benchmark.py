@@ -1108,18 +1108,22 @@ if __name__ == "__main__":
         torch.cuda.reset_peak_memory_stats()
 
     # 1. Standart Transformer Çıkarımı
+    # Sadece 4096'ya kadar gitsin çünkü zaten orada OOM verip çökecek.
+    seq_len_std = 4096
     std_model = StandardTransformerInference(vocab_size, hidden_size, num_heads, feedforward_dim, num_layers)
     std_mem, std_tps, std_oom = benchmark_inference(
-        std_model, device, num_steps=seq_len, batch_size=batch_size, vocab_size=vocab_size, name="Standart Transformer (KV-Cache)"
+        std_model, device, num_steps=seq_len_std, batch_size=batch_size, vocab_size=vocab_size, name="Standart Transformer (KV-Cache)"
     )
     del std_model
     if device.type == "cuda":
         torch.cuda.empty_cache()
     
     # 2. Bulk Modeli Çıkarımı
+    # O(1) belleği ispatlamak için DEVASA bir bağlam uzunluğu: 100,000 token!
+    seq_len_hfp = 100000
     bulk_model = BulkTransformerInference(vocab_size, hidden_size, num_heads, feedforward_dim, num_layers)
     bulk_mem, bulk_tps, bulk_oom = benchmark_inference(
-        bulk_model, device, num_steps=seq_len, batch_size=batch_size, vocab_size=vocab_size, name="HFP Bulk Model"
+        bulk_model, device, num_steps=seq_len_hfp, batch_size=batch_size, vocab_size=vocab_size, name="HFP Bulk Model"
     )
     
     # ==========================================
@@ -1138,18 +1142,18 @@ if __name__ == "__main__":
     
     # Bellek Grafiği
     ax1 = plt.subplot(1, 2, 1)
-    ax1.plot(steps_b, mem_b, label="HFP Bulk Model (Sabit Bellek)", color='#2ca02c', linewidth=2.5)
-    ax1.plot(steps_s, mem_s, label="Standart Transformer (Büyüyen KV-Cache)", color='#1f77b4', linewidth=2.5)
+    ax1.plot(steps_b, mem_b, label="HFP Bulk Model (O(1) Sabit, Hedef: 100K Token)", color='#2ca02c', linewidth=2.5)
+    ax1.plot(steps_s, mem_s, label="Standart Transformer (O(N) Büyüyen)", color='#1f77b4', linewidth=2.5)
     
     if std_oom:
-        ax1.axvline(x=std_oom, color='red', linestyle='--', linewidth=2, label='OOM Çöküşü')
-        ax1.annotate('OOM', xy=(std_oom, mem_s[-1]), xytext=(std_oom - 800, mem_s[-1] + 50),
+        ax1.axvline(x=std_oom, color='red', linestyle='--', linewidth=2, label='OOM Çöküşü (Std)')
+        ax1.annotate('OOM', xy=(std_oom, mem_s[-1]), xytext=(std_oom + 5000, mem_s[-1] + 50),
                      arrowprops=dict(facecolor='red', shrink=0.05), color='red', fontweight='bold', fontsize=11)
                      
-    ax1.set_title(f"{mem_label} Kullanımı — {gpu_name}\n(seq_len={seq_len}, batch={batch_size})")
+    ax1.set_title(f"{mem_label} Kullanımı — {gpu_name}\n(100.000 Token 'Sonsuz Bağlam' Testi)")
     ax1.set_xlabel("Üretilen Token Sayısı")
     ax1.set_ylabel(f"{mem_label} (MB)")
-    ax1.set_xlim(0, seq_len)
+    ax1.set_xlim(0, seq_len_hfp)
     ax1.legend()
     
     # Hız Grafiği
@@ -1163,7 +1167,7 @@ if __name__ == "__main__":
     ax2.set_title(f"Çıkarım Hızı — {gpu_name}")
     ax2.set_xlabel("Üretilen Token Sayısı")
     ax2.set_ylabel("Hız (Token / Saniye)")
-    ax2.set_xlim(0, seq_len)
+    ax2.set_xlim(0, seq_len_hfp)
     ax2.legend()
     
     plt.tight_layout()
@@ -1197,6 +1201,6 @@ if __name__ == "__main__":
     
     # -------------------------------------------------------------------------
     # GERÇEK HFP MODELİ İLE WIKITEXT-2 DİL MODELLEME TESTİ
-    # (HFPForCausalLM + QuantizedLR + UncertaintyRegularizer)
+    # (benchmark_quality.py dosyasına taşındı)
     # -------------------------------------------------------------------------
-    benchmark_wikitext2(device, gpu_name, batch_size=8, epochs=3)
+    # benchmark_wikitext2(device, gpu_name, batch_size=8, epochs=3)

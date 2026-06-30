@@ -27,6 +27,10 @@ By introducing advanced thermodynamic concepts into the standard Transformer arc
 
 ## Performance & Benchmarks (124M Scale)
 
+> [!IMPORTANT]
+> **Clarification on Weights vs. Benchmarks:** The weights provided in this repository are **untrained (Architecture only)**. The purpose of this repository is to open-source the `HFPForCausalLM` architecture. 
+> The performance graphs shown below are the results of controlled, isolated academic benchmarks trained from scratch using this exact architecture to mathematically prove its $O(1)$ memory scaling and learning capabilities against a standard Transformer.
+
 To definitively prove that the $O(1)$ memory mechanism scales to production levels without degrading linguistic quality, the architecture was benchmarked at a **124M Parameter (GPT-2 Small Equivalent)** configuration (12 Layers, 768 Hidden Size, 12 Heads).
 
 ### 1. VRAM Scaling (Memory)
@@ -63,6 +67,17 @@ The elimination of the KV-Cache bottleneck translates directly to massive hardwa
 - **Zero VRAM Spikes (Cost Efficiency):** Traditional LLMs require clusters of highly expensive GPUs (e.g., A100/H100) purely to hold the KV-Cache for long contexts. HFP operates with a fixed memory footprint regardless of context length, drastically reducing the hardware requirements.
 - **Edge Computing & CPU Inference Potential:** Because memory is strictly $O(1)$ and deeply compressed, HFP architectures can easily run inference for infinitely long contexts on standard CPUs, local servers, and Edge devices (mobile phones, IoT) without crashing due to RAM exhaustion.
 - **Sustainable AI Operations:** Constant memory scaling means predictable cloud hosting bills and lower power consumption, paving the way for sustainable, infinitely-running AI agents.
+
+## Training Strategy for 1B+ Parameter Models
+
+A common question regarding fixed-memory models is how they scale during the training phase. It is crucial to distinguish between **Inference** and **Training**:
+
+1. **O(1) Memory applies to KV-Cache (Inference & Forward Pass):** The HFP architecture strictly caps memory growth during generation by continuously compressing context into the `bulk_state`. 
+2. **Training Memory (Autograd):** During backpropagation, PyTorch must store activation graphs for gradient calculation. This inherently scales with sequence length $O(L)$ for any model. 
+3. **Scaling to 1B+ Parameters:** To train a 1B parameter HFP model on consumer GPUs (e.g., 24GB VRAM), we utilize:
+   - **Gradient Checkpointing:** Trades compute for memory by re-calculating activations during the backward pass.
+   - **8-bit Optimizers (e.g., bitsandbytes AdamW):** Reduces optimizer state memory by 75%.
+   - **Micro-batching & Chunking:** Because the HFP architecture utilizes a `bulk_state` (Long-term memory) that naturally persists across sequence boundaries, training data can be fed in truncated chunks (Truncated BPTT). The model maintains historical context through the bulk state without needing a massive continuous sequence in the autograd graph.
 
 ## Usage & Implementation
 

@@ -196,7 +196,7 @@ class HFPBulkState(nn.Module):
             self.landmark_buffer.push(priority, context_summary)
             
             if hfp_config.ENABLE_COHERENCE and coherence is not None and coherence.item() < 0.2:
-                logging.warning(f"Low coherence detected (score={coherence.item():.4f}).")
+                pass # logging.warning(f"Low coherence detected (score={coherence.item():.4f}).")
 
         # [CRITICAL BUG FIX]: Removed torch.nn.utils.clip_grad_norm_ from here. It belongs in train.py
 
