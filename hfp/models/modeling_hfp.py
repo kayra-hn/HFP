@@ -1,11 +1,26 @@
 import torch
 import torch.nn as nn
+import math
 from transformers import PreTrainedModel
 from transformers.modeling_outputs import CausalLMOutputWithPast, BaseModelOutputWithPast
 from .configuration_hfp import HFPConfig
 
 from ..core.hfp_bulk_state import HFPBulkState
 from ..core.bulk_trigger_decoder import BulkTriggerDecoderLayer
+
+class SinusoidalPositionalEncoding(nn.Module):
+    def __init__(self, hidden_size, max_len=5000):
+        super().__init__()
+        pe = torch.zeros(max_len, hidden_size)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, hidden_size, 2).float() * (-math.log(10000.0) / hidden_size))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe.unsqueeze(0))
+
+    def forward(self, x):
+        seq_len = x.size(1)
+        return x + self.pe[:, :seq_len, :].to(x.device)
 
 class HFPPreTrainedModel(PreTrainedModel):
     config_class = HFPConfig
@@ -29,6 +44,7 @@ class HFPModel(HFPPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
+        self.pos_encoder = SinusoidalPositionalEncoding(config.hidden_size)
         
         self.layers = nn.ModuleList([
             BulkTriggerDecoderLayer(
@@ -56,8 +72,9 @@ class HFPModel(HFPPreTrainedModel):
         self.norm = nn.LayerNorm(config.hidden_size)
         self.post_init()
 
-    def forward(self, input_ids, past_key_values=None, use_cache=False, **kwargs):
+    def forward(self, input_ids, attention_mask=None, past_key_values=None, use_cache=False, **kwargs):
         x = self.embed_tokens(input_ids)
+        x = self.pos_encoder(x)
         
         if past_key_values is None or not isinstance(past_key_values, (tuple, list)):
             past_key_values_list = [None] * len(self.layers)
@@ -87,8 +104,8 @@ class HFPForCausalLM(HFPPreTrainedModel, GenerationMixin):
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.post_init()
 
-    def forward(self, input_ids, labels=None, past_key_values=None, use_cache=False, **kwargs):
-        outputs = self.hfp(input_ids, past_key_values=past_key_values, use_cache=use_cache, **kwargs)
+    def forward(self, input_ids, attention_mask=None, labels=None, past_key_values=None, use_cache=False, **kwargs):
+        outputs = self.hfp(input_ids, attention_mask=attention_mask, past_key_values=past_key_values, use_cache=use_cache, **kwargs)
         hidden_states = outputs.last_hidden_state
         logits = self.lm_head(hidden_states)
         

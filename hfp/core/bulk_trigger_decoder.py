@@ -215,7 +215,12 @@ class BulkTriggerDecoderLayer(nn.Module):
         memory_bank = torch.cat([short_mem, medium_mem_unsqueezed, long_mem_unsqueezed], dim=1)
         
         # 3. Çapraz Dikkat (Cross-Attention) Uygulanması
-        attn_out, _ = self.cross_attention(query=x, key=memory_bank, value=memory_bank)
+        seq_len = x.size(1)
+        mem_len = memory_bank.size(1)
+        # Üçgen maske oluşturma (diagonal=1 ile t anındaki query'nin t+1'i görmesini engeller)
+        causal_mask = torch.triu(torch.ones(seq_len, mem_len, device=x.device), diagonal=1).bool()
+        
+        attn_out, _ = self.cross_attention(query=x, key=memory_bank, value=memory_bank, attn_mask=causal_mask)
         x = self.norm1(x + attn_out)
         
         # 4. İleri Beslemeli Ağ (FFN)
