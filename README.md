@@ -13,10 +13,22 @@ The HFP architecture replaces conventional ad-hoc regularizations with strict ma
 - **Curvature & Entropy Maps**: The architecture inherently tracks geometric curvature and gate entropy, emitting warnings when the representation space loses coherence (e.g., `Low coherence detected`).
 
 ## Architecture Details
-The model (`HFPForCausalLM`) is parameter-equivalent to standard scaled models (e.g., GPT-2 Small, ~124M parameters) but operates with a fundamentally different internal dynamic state (`hfp_bulk_state`), tracking variables such as:
-- Short memory boundaries (`short_len`)
-- Bulk state dimensions (`bulk_dim`)
-- Defect Flags and Conservation Checks
+
+The core model, `HFPForCausalLM` (~124M parameters), structurally maps to a standard Causal LM but intercepts and overrides the hidden state propagation using physics-informed modules.
+
+### 1. Thermodynamic Context Compression (`bulk_trigger_decoder`)
+Unlike continuous linear attention (e.g., Google's Infini-attention) which blindly compresses data, HFP employs an **active thermodynamic trigger**. The short-term memory is constantly evaluated for its **Entropy** and **Curvature**. Once the entropy of the current cognitive state reaches a saturation threshold, the `bulk_trigger` activates, compressing the local context into a high-dimensional `bulk_state` (Long-term memory). This prevents context dilution and catastrophic forgetting while drastically reducing the $O(N^2)$ attention bottlenecks.
+
+### 2. Physics-Informed Internal State (`hfp_bulk_state`)
+The architecture introduces several non-standard tracking variables directly influenced by physical laws:
+- **Entropy Maps:** Tracks the chaos/stability of the attention gates, emitting warnings (`Low coherence detected`) if the cognitive space degrades.
+- **Curvature:** Measures the geometric distortion of the vector space to prevent gradient vanishing/exploding.
+- **Conservation Checks:** Enforces mathematical conservation laws across hidden states to ensure the model doesn't hallucinate context shifts out of thin air.
+
+### 3. Quantum-Inspired Schedulers (`physics_optimizers.py`)
+To solve the instability of LLM training (loss spikes):
+- **QuantizedLR:** Instead of continuous cosine decay, the learning rate transitions through discrete "energy levels" (quanta) based on mathematical plateaus.
+- **Stiff Transient Scheduler:** Applies "stiffness" (borrowed from stiff ODE systems) to the optimizer. It allows aggressive early exploration but applies immense thermodynamic braking during fine-tuning, preventing the model from collapsing.
 
 ## License
 This project is open-sourced under the **AGPL v3 License**. 
