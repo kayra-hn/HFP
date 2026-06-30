@@ -1,6 +1,6 @@
 import torch
 from transformers import AutoTokenizer
-from hfp.models.modeling_hfp import HFPForCausalLM, HFPConfig
+from hfp import HFPForCausalLM, HFPConfig
 import sys
 
 def main():

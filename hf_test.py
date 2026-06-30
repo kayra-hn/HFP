@@ -1,6 +1,6 @@
 import torch
-from configuration_hfp import HFPConfig
-from modeling_hfp import HFPForCausalLM
+from hfp import HFPConfig
+from hfp import HFPForCausalLM
 
 def test_hfp_huggingface():
     print("--- HuggingFace Entegrasyon Testi Başlıyor ---")

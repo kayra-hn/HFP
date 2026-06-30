@@ -1,6 +1,6 @@
 import torch
 from transformers import AutoTokenizer
-from hfp.models.modeling_hfp import HFPForCausalLM, HFPConfig
+from hfp import HFPForCausalLM, HFPConfig
 
 def run_benchmark():
     print("[1] Tokenizer yükleniyor...")

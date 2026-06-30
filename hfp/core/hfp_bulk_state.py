@@ -45,6 +45,12 @@ class HFPBulkState(nn.Module):
         """Returns the initial empty state tuple."""
         return (None, None, None, 0, 0, 0, self.base_short_len)
 
+    def reset_state(self):
+        """Sıfırlama metodu (Passkey vb. bağımsız testler arasında state temizliği)"""
+        self.landmark_buffer.clear()
+        if hasattr(self, "_last_gate"):
+            del self._last_gate
+
     def _get_short_view(self, short_memory, fill_count, short_len_dynamic):
         """Return the filled portion of the short‑memory ring buffer."""
         if short_memory is None:

@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import LRScheduler
 from transformers import AutoTokenizer
 from datasets import load_dataset
-from hfp.models.modeling_hfp import HFPForCausalLM, HFPConfig
+from hfp import HFPForCausalLM, HFPConfig
 from hfp.physics.physics_optimizers import QuantizedLR, UncertaintyRegularizer, StiffTransientScheduler
 
 def get_dataloader(batch_size=8, seq_len=128):

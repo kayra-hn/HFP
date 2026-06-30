@@ -1,5 +1,5 @@
-from configuration_hfp import HFPConfig
-from modeling_hfp import HFPForCausalLM
+from hfp import HFPConfig
+from hfp import HFPForCausalLM
 import torch
 
 # Modeli yükle (rastgele ağırlıklarla - henüz eğitilmedi)
