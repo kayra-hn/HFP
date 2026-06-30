@@ -209,18 +209,30 @@ class BulkTriggerDecoderLayer(nn.Module):
             aux_losses.append(torch.tensor(1.0 if conservation_check(short_mem) else 0.0, device=short_mem.device))
         
         # 2. Cross-Attention için Bellek Bankasını (Memory Bank) Hazırlama
-        medium_mem_unsqueezed = medium_mem.unsqueeze(1)
-        long_mem_unsqueezed = long_mem.unsqueeze(1)
+        if past_state is not None and past_state[0] is not None:
+            past_short_mem, past_medium_mem, past_long_mem = past_state[0], past_state[1], past_state[2]
+        else:
+            past_short_mem = torch.zeros(x.size(0), 1, self.hidden_size, device=x.device, dtype=x.dtype)
+            past_medium_mem = torch.zeros(x.size(0), self.hidden_size, device=x.device, dtype=x.dtype)
+            past_long_mem = torch.zeros(x.size(0), self.hidden_size, device=x.device, dtype=x.dtype)
+
+        past_medium_mem_unsqueezed = past_medium_mem.unsqueeze(1)
+        past_long_mem_unsqueezed = past_long_mem.unsqueeze(1)
         
-        memory_bank = torch.cat([short_mem, medium_mem_unsqueezed, long_mem_unsqueezed], dim=1)
+        # x'i bellek bankasına ekleyerek (Self-Attention + Cross-Attention) birleştiriyoruz
+        memory_bank = torch.cat([x, past_short_mem, past_medium_mem_unsqueezed, past_long_mem_unsqueezed], dim=1)
         
         # 3. Çapraz Dikkat (Cross-Attention) Uygulanması
         seq_len = x.size(1)
         mem_len = memory_bank.size(1)
-        # Üçgen maske oluşturma (diagonal=1 ile t anındaki query'nin t+1'i görmesini engeller)
-        causal_mask = torch.triu(torch.ones(seq_len, mem_len, device=x.device), diagonal=1).bool()
         
-        attn_out, _ = self.cross_attention(query=x, key=memory_bank, value=memory_bank, attn_mask=causal_mask)
+        # Çift Maske (Dual Mask): Kendi içindeki kelimeler için Üçgen (Causal), geçmiş hafıza için Tam Açık
+        past_mem_len = mem_len - seq_len
+        causal_part = torch.triu(torch.ones(seq_len, seq_len, device=x.device), diagonal=1).bool()
+        past_part = torch.zeros(seq_len, past_mem_len, device=x.device).bool()
+        dual_mask = torch.cat([causal_part, past_part], dim=1)
+        
+        attn_out, _ = self.cross_attention(query=x, key=memory_bank, value=memory_bank, attn_mask=dual_mask)
         x = self.norm1(x + attn_out)
         
         # 4. İleri Beslemeli Ağ (FFN)

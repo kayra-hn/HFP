@@ -126,83 +126,71 @@ class HFPBulkState(nn.Module):
         # Clear landmark buffer at the start of a sequence update if we want fresh landmarks,
         # but typically it's a running buffer. We'll leave it as a class attribute since it's just monitoring.
         
-        for i in range(seq_len):
-            token = x[:, i:i+1, :]
-            if self.training:
-                # append to short memory and truncate if needed
-                if short_memory is None:
-                    short_memory = token
-                else:
-                    short_memory = torch.cat([short_memory, token], dim=1)
-                    if short_memory.size(1) > short_len_dynamic:
-                        short_memory = short_memory[:, -short_len_dynamic:, :]
+        # Vectorized Block Update (O(1) instead of O(N))
+        # 1. Update Short Memory
+        if short_memory is None:
+            short_memory = x
+        else:
+            short_memory = torch.cat([short_memory, x], dim=1)
+            
+        if short_memory.size(1) > short_len_dynamic:
+            short_memory = short_memory[:, -short_len_dynamic:, :]
+            
+        token_count += seq_len
+        fill_count = short_memory.size(1)
+        write_idx = (write_idx + seq_len) % short_len_dynamic
+        
+        context_summary = short_memory.mean(dim=1)
+
+        # 2. Update Medium Memory
+        medium_memory = (1.0 - self.medium_momentum) * medium_memory + self.medium_momentum * context_summary
+
+        # 3. Gating Logic
+        combined_features = torch.cat([medium_memory, context_summary], dim=-1)
+        gate_logits = self.importance_gate(combined_features) / self.gate_temperature
+        
+        use_mixed_precision = hfp_config.MIXED_PRECISION and batch_size > 16
+        if use_mixed_precision:
+            gate_logits = gate_logits.half()
+            
+        gate = torch.sigmoid(self.gate_dropout(gate_logits))
+        gate = gate.to(long_memory.dtype)
+        
+        self._last_gate = gate.clone().detach()
+        
+        gate_entropy = None
+        if hfp_config.ENABLE_ENTROPY_MAP or hfp_config.ENABLE_DEFECT_FLAG or hfp_config.ENABLE_RYU_TAKAYANAGI:
+            gate_entropy = compute_gate_entropy(gate)
+            
+        # [5D INTEGRATION]: Witten Propagator Warp Factor
+        if gate_entropy is not None:
+            warp_factor = torch.exp(-hfp_config.WARP_K * gate_entropy)
+            gate_eff = gate * warp_factor
+        else:
+            gate_eff = gate
+            
+        # 4. Update Long Memory
+        long_memory = (1.0 - gate_eff) * long_memory + gate_eff * context_summary
+
+        # 5. Dynamic short-memory expansion based on entropy
+        if gate_entropy is not None:
+            short_len_dynamic, short_memory = self._maybe_expand_short_memory(gate_entropy, short_len_dynamic, short_memory)
+
+        # 6. Landmark buffer update
+        if hfp_config.ENABLE_DEFECT_FLAG:
+            coherence = None
+            if hfp_config.ENABLE_COHERENCE:
+                coherence = coherence_score(short_memory)
+            
+            if gate_entropy is not None and coherence is not None:
+                priority = coherence.item() * gate_entropy.item()
             else:
-                # ring buffer update
-                if short_memory is None:
-                    short_memory = torch.zeros(batch_size, short_len_dynamic,
-                                                    self.hidden_size, device=device, dtype=dtype)
-                short_memory[:, write_idx, :] = token.squeeze(1)
-                write_idx = (write_idx + 1) % short_len_dynamic
-                fill_count = min(fill_count + 1, short_len_dynamic)
-
-            token_count += 1
-            context_summary = self._get_short_mean(short_memory, fill_count, short_len_dynamic)
-
-            # medium memory update
-            if token_count % self.medium_freq == 0:
-                medium_memory = (1.0 - self.medium_momentum) * medium_memory + \
-                                    self.medium_momentum * context_summary
-
-            # combine medium and short summary for gating
-            combined_features = torch.cat([medium_memory, context_summary], dim=-1)
-            gate_logits = self.importance_gate(combined_features) / self.gate_temperature
+                priority = gate.mean().item()
+                
+            self.landmark_buffer.push(priority, context_summary)
             
-            # Activate mixed precision only for large batches
-            use_mixed_precision = hfp_config.MIXED_PRECISION and batch_size > 16
-            if use_mixed_precision:
-                gate_logits = gate_logits.half()
-                
-            gate = torch.sigmoid(self.gate_dropout(gate_logits))
-            
-            # [CRITICAL BUG FIX]: Ensure gate is same dtype as long_memory (e.g. back to float32 if mixed precision casted it)
-            gate = gate.to(long_memory.dtype)
-            
-            self._last_gate = gate.clone().detach()
-            
-            # Conditional computations
-            gate_entropy = None
-            if hfp_config.ENABLE_ENTROPY_MAP or hfp_config.ENABLE_DEFECT_FLAG or hfp_config.ENABLE_RYU_TAKAYANAGI:
-                gate_entropy = compute_gate_entropy(gate)
-                
-            # [5D INTEGRATION]: Witten Propagator Warp Factor
-            if gate_entropy is not None:
-                warp_factor = torch.exp(-hfp_config.WARP_K * gate_entropy)
-                gate_eff = gate * warp_factor
-            else:
-                gate_eff = gate
-                
-            long_memory = (1.0 - gate_eff) * long_memory + gate_eff * context_summary
-
-            # Dynamic short‑memory expansion based on entropy
-            if gate_entropy is not None:
-                short_len_dynamic, short_memory = self._maybe_expand_short_memory(gate_entropy, short_len_dynamic, short_memory)
-
-            # Update landmark buffer based on gate strength and priority
-            if hfp_config.ENABLE_DEFECT_FLAG:
-                coherence = None
-                if hfp_config.ENABLE_COHERENCE:
-                    short_view = self._get_short_view(short_memory, fill_count, short_len_dynamic)
-                    coherence = coherence_score(short_view)
-                
-                if gate_entropy is not None and coherence is not None:
-                    priority = coherence.item() * gate_entropy.item()
-                else:
-                    priority = gate.mean().item()
-                    
-                self.landmark_buffer.push(priority, context_summary)
-                
-                if hfp_config.ENABLE_COHERENCE and coherence is not None and coherence.item() < 0.2:
-                    logging.warning(f"Low coherence detected (score={coherence.item():.4f}).")
+            if hfp_config.ENABLE_COHERENCE and coherence is not None and coherence.item() < 0.2:
+                logging.warning(f"Low coherence detected (score={coherence.item():.4f}).")
 
         # [CRITICAL BUG FIX]: Removed torch.nn.utils.clip_grad_norm_ from here. It belongs in train.py
 
