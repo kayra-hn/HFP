@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 from .hfp_config import config as hfp_config
-from .hfp_utils import compute_curvature, compute_entropy_map, defect_flag, coherence_score, conservation_check
+from .hfp_utils import compute_curvature, compute_5d_curvature, compute_entropy_map, magnitude_defect_flag, coherence_score, conservation_check, ryu_takayanagi_loss
 from .hfp_bulk_state import HFPBulkState
 # Not: Bahsettiğiniz HFPLinear sınıfının temel bir temsilini ekliyoruz.
 # Bu sınıf halihazırda var ise bu kısmı atlayıp kendi import'unuzu kullanabilirsiniz.
@@ -43,7 +43,8 @@ class TunnelingDropout(nn.Module):
         self.p = p
         self.tunnel_depth = tunnel_depth
         self.decay_factor = decay_factor
-        self.buffer = []
+        from collections import deque
+        self.buffer = deque(maxlen=tunnel_depth)
 
     def forward(self, x):
         if not self.training or self.p == 0:
@@ -58,8 +59,8 @@ class TunnelingDropout(nn.Module):
         
         output = kept_x
         # Eğer tünel derinliğine ulaşıldıysa, eski enerjiyi sönümleyerek geri döndür
-        if len(self.buffer) > self.tunnel_depth:
-            tunneled_x = self.buffer.pop(0)
+        if len(self.buffer) == self.tunnel_depth:
+            tunneled_x = self.buffer.popleft().to(output.device)
             # Batch size değişimi veya tensor shape uyuşmazlığı kontrolü
             if tunneled_x.shape == output.shape:
                 output = output + tunneled_x * self.decay_factor
@@ -183,14 +184,25 @@ class BulkTriggerDecoderLayer(nn.Module):
         short_mem, medium_mem, long_mem, new_past_state = bulk_state.update(x, past_state=past_state)
         # Collect auxiliary losses if any feature is enabled
         aux_losses = []
+        
+        # [5D INTEGRATION]: Ryu-Takayanagi Entropy Bound
+        if hfp_config.ENABLE_RYU_TAKAYANAGI:
+            gate_entropy_tensor = bulk_state.gate_entropy_loss() / hfp_config.REG_WEIGHT if hfp_config.ENABLE_ENTROPY_MAP else torch.tensor(0.0, device=x.device)
+            rt_loss = ryu_takayanagi_loss(gate_entropy_tensor, long_mem)
+            aux_losses.append(rt_loss.unsqueeze(0))
+            
         if hfp_config.ENABLE_ENTROPY_MAP:
             aux_losses.append(bulk_state.gate_entropy_loss())
-        if hfp_config.ENABLE_CURVATURE:
-            # Placeholder curvature based on short memory summary
+            
+        # [5D INTEGRATION]: 5D Radial Curvature
+        if hfp_config.ENABLE_5D_CURVATURE:
+            aux_losses.append(compute_5d_curvature(short_mem, medium_mem, long_mem).unsqueeze(0))
+        elif hfp_config.ENABLE_CURVATURE:
+            # 1D Temporal curvature fallback
             aux_losses.append(compute_curvature(short_mem).unsqueeze(0))
         if hfp_config.ENABLE_DEFECT_FLAG:
             # Use defect flag on short memory summary
-            aux_losses.append(defect_flag(short_mem).mean().unsqueeze(0))
+            aux_losses.append(magnitude_defect_flag(short_mem).mean().unsqueeze(0))
         if hfp_config.ENABLE_COHERENCE:
             aux_losses.append(coherence_score(short_mem).unsqueeze(0))
         if hfp_config.ENABLE_CONSERVATION:
@@ -209,6 +221,10 @@ class BulkTriggerDecoderLayer(nn.Module):
         # 4. İleri Beslemeli Ağ (FFN)
         ffn_out = self.ffn(x)
         x = self.norm2(x + ffn_out)
+        
+        # [CRITICAL BUG FIX]: Collect orthogonality loss from EntangledFFN so it affects training
+        if return_aux:
+            aux_losses.append(self.ffn.get_orthogonality_loss().unsqueeze(0))
         
         # 5. Logit Üretimi
         if self.lm_head is not None:

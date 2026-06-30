@@ -35,6 +35,29 @@ class UncertaintyRegularizer:
                     noise = eta * torch.randn_like(param)
                     param.add_(noise)
 
+class StiffTransientScheduler(LRScheduler):
+    def __init__(self, optimizer, plateau_threshold, stiffness_p, last_epoch=-1):
+        self.plateau_threshold = plateau_threshold
+        self.stiffness_p = stiffness_p
+        self.is_active = False
+        self.activation_epoch = 0
+        super().__init__(optimizer, last_epoch)
+
+    def step(self, val_loss=None, epoch=None):
+        if val_loss is not None:
+            if not self.is_active and val_loss < self.plateau_threshold:
+                self.is_active = True
+                self.activation_epoch = self.last_epoch
+        super().step(epoch)
+
+    def get_lr(self):
+        if not self.is_active:
+            return [base_lr for base_lr in self.base_lrs]
+        
+        epochs_since_active = max(0, self.last_epoch - self.activation_epoch)
+        return [base_lr / (1.0 + self.stiffness_p * epochs_since_active)
+                for base_lr in self.base_lrs]
+
 class QuantizedLR(object):
     """
     Kuantize Edilmiş Enerji Seviyeleri tabanlı Öğrenme Oranı Zamanlayıcısı.

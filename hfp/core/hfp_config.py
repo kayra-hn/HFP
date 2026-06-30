@@ -13,6 +13,8 @@ class HFPConfig:
     ENABLE_DEFECT_FLAG: bool = True
     ENABLE_COHERENCE: bool = True
     ENABLE_CONSERVATION: bool = True
+    ENABLE_RYU_TAKAYANAGI: bool = True
+    ENABLE_5D_CURVATURE: bool = True
 
     # Hyper‑parameters (used when the feature is enabled)
     REG_WEIGHT: float = 0.01               # gate‑entropy regularisation weight
@@ -21,6 +23,7 @@ class HFPConfig:
     MAX_SHORT_LEN: int = 32                # maximum short‑memory length (tokens)
     GRAD_CLIP_VAL: float = 0.5             # gradient‑clipping value per memory block (tighter)
     MIXED_PRECISION: bool = True          # use torch.float16 for gate logits only
+    WARP_K: float = 0.5                    # Witten propagator warp factor
 
 # Global singleton configuration used throughout the package
 config = HFPConfig()

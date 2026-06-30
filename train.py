@@ -6,30 +6,7 @@ from torch.optim.lr_scheduler import LRScheduler
 from transformers import AutoTokenizer
 from datasets import load_dataset
 from hfp.models.modeling_hfp import HFPForCausalLM, HFPConfig
-from hfp.physics.physics_optimizers import QuantizedLR, UncertaintyRegularizer
-
-class StiffTransientScheduler(LRScheduler):
-    def __init__(self, optimizer, plateau_threshold, stiffness_p, last_epoch=-1):
-        self.plateau_threshold = plateau_threshold
-        self.stiffness_p = stiffness_p
-        self.is_active = False
-        self.activation_epoch = 0
-        super().__init__(optimizer, last_epoch)
-
-    def step(self, val_loss=None, epoch=None):
-        if val_loss is not None:
-            if not self.is_active and val_loss < self.plateau_threshold:
-                self.is_active = True
-                self.activation_epoch = self.last_epoch
-        super().step(epoch)
-
-    def get_lr(self):
-        if not self.is_active:
-            return [base_lr for base_lr in self.base_lrs]
-        
-        epochs_since_active = max(0, self.last_epoch - self.activation_epoch)
-        return [base_lr / (1.0 + self.stiffness_p * epochs_since_active)
-                for base_lr in self.base_lrs]
+from hfp.physics.physics_optimizers import QuantizedLR, UncertaintyRegularizer, StiffTransientScheduler
 
 def get_dataloader(batch_size=8, seq_len=128):
     print("Veri Seti: Salesforce/wikitext-2-raw-v1 indiriliyor...")
@@ -52,7 +29,8 @@ def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Eğitim Cihazı: {device}")
     
-    batch_size = 8
+    batch_size = 2  # VRAM çökmesini engellemek için 8'den 2'ye düşürüldü
+    grad_accum_steps = 4  # Etkili Batch Size'ı tekrar 8 yapmak için gradyan biriktirme
     seq_len = 128
     epochs = 10
     save_path = "hfp_weights.pt"
@@ -90,23 +68,29 @@ def train():
     for epoch in range(1, epochs + 1):
         model.train()
         epoch_loss = 0.0
+        optimizer.zero_grad()
         
         for batch_idx, batch in enumerate(train_loader):
             inputs = batch["input_ids"].to(device)
-            optimizer.zero_grad()
             
             # Forward pass (Padding kısımlarını Loss hesabından çıkar)
             labels = inputs.clone()
             labels[labels == pad_token_id] = -100
             outputs = model(inputs, labels=labels)
-            loss = outputs.loss
+            loss = outputs.loss / grad_accum_steps
             
             # Backward pass
             loss.backward()
-            reg.step()
-            optimizer.step()
             
-            epoch_loss += loss.item()
+            # Gradient Accumulation: Belirli bir adıma ulaşınca ağırlıkları güncelle
+            if (batch_idx + 1) % grad_accum_steps == 0:
+                # [CRITICAL BUG FIX]: Gradient clipping belongs here, not in forward pass
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                reg.step()
+                optimizer.step()
+                optimizer.zero_grad()
+            
+            epoch_loss += (loss.item() * grad_accum_steps)
             
             if batch_idx % 50 == 0:
                 print(f"Epoch {epoch} | Adım {batch_idx}/{len(train_loader)} | Anlık Loss: {loss.item():.4f}")
