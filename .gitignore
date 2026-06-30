@@ -1,0 +1,27 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyTorch weights and states
+*.pt
+*.pth
+*.ckpt
+
+# Logs
+*.log
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Project specific
+trained_hfp_baby/
+hfp_hf_test_save/
+benchmark_results*.png
+passkey_results.png
