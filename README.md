@@ -16,20 +16,34 @@ The HFP architecture replaces conventional ad-hoc regularizations with strict ma
 
 The core model, `HFPForCausalLM` (~124M parameters), structurally maps to a standard Causal LM but intercepts and overrides the hidden state propagation using physics-informed modules.
 
-### 1. Thermodynamic Context Compression (`bulk_trigger_decoder`)
-Unlike continuous linear attention (e.g., Google's Infini-attention) which blindly compresses data, HFP employs an **active thermodynamic trigger**. The short-term memory is constantly evaluated for its **Entropy** and **Curvature**. Once the entropy of the current cognitive state reaches a saturation threshold, the `bulk_trigger` activates, compressing the local context into a high-dimensional `bulk_state` (Long-term memory). This prevents context dilution and catastrophic forgetting while drastically reducing the $O(N^2)$ attention bottlenecks.
+### 1. Thermodynamic Context Compression & O(1) Memory Scaling
+Unlike continuous linear attention (e.g., Google's Infini-attention) which blindly compresses data, HFP employs an **active thermodynamic trigger**. The short-term memory is constantly evaluated for its **Entropy** and **Curvature**. Once the entropy of the current cognitive state reaches a saturation threshold, the `bulk_trigger` activates, compressing the local context into a high-dimensional `bulk_state` (Long-term memory). 
+**HPC Breakthrough (KV-Cache Elimination):** The memory update mechanism has been completely vectorized into a block-level operation. This reduces the time complexity from $O(N)$ to $O(1)$ per block, and completely eliminates the quadratic $O(N^2)$ VRAM consumption of standard KV-Caches. The architecture can process effectively infinite context sizes with constant, highly compressed VRAM footprint on single consumer GPUs.
 
-### 2. Physics-Informed Internal State (`hfp_bulk_state` & `hfp_utils`)
+### 2. Dual-Masked Self-Cross Attention (Linguistic Rigor)
+To prevent "Causal Leakage" (predicting the future) while maintaining access to historical deep memory, HFP uses a custom Dual-Mask attention topology:
+- **Local Context:** A strict Triangular Causal Mask prevents tokens from attending to future tokens within the local sequence.
+- **Deep Context:** A Full Matrix Mask allows total, unhindered read-access to the 5D historical bulk memory.
+*Coupled with injected Sinusoidal Positional Encodings, the model strictly adheres to temporal linguistic rules without positional blindness.*
+
+### 3. Physics-Informed Internal State (`hfp_bulk_state` & `hfp_utils`)
 The architecture introduces several non-standard tracking variables directly influenced by physical laws:
 - **5D Radial Curvature:** Unlike standard models that only measure temporal change, HFP measures the second derivative across its *memory depth* (Short -> Medium -> Long). It calculates a Ricci-scalar proxy to regulate the internal "gravity" of the context window.
 - **Witten Boundary-to-Bulk Propagator:** The transition of information from short-term memory (Boundary) to long-term memory (Bulk) is not linear. It is modulated by a warp factor $e^{-k \cdot S}$ based on the entropy (chaos) of the boundary, physically shielding the deep bulk from noisy inputs.
 - **Ryu-Takayanagi Entropy Bound:** Inspired by the holographic entanglement entropy formula, the model enforces a strict mathematical bound: the entropy of the boundary cannot exceed the surface area of the bulk. If the model approaches hallucination, a ReLU penalty restricts the gradients.
 - **Conservation Checks:** Enforces mathematical conservation laws across hidden states to ensure the model doesn't hallucinate context shifts out of thin air.
 
-### 3. Quantum-Inspired Schedulers (`physics_optimizers.py`)
+### 4. Quantum-Inspired Schedulers (`physics_optimizers.py`)
 To solve the instability of LLM training (loss spikes):
 - **QuantizedLR:** Instead of continuous cosine decay, the learning rate transitions through discrete "energy levels" (quanta) based on mathematical plateaus.
 - **Stiff Transient Scheduler:** Applies "stiffness" (borrowed from stiff ODE systems) to the optimizer. It allows aggressive early exploration but applies immense thermodynamic braking during fine-tuning, preventing the model from collapsing.
+
+## Quickstart & Benchmarks
+The architecture includes `benchmark_test.py` to validate tensor shape alignment, causality rules, and O(1) memory stability without requiring model weights to be fully trained.
+
+```bash
+python benchmark_test.py
+```
 
 ## License
 This project is open-sourced under the **AGPL v3 License**. 
