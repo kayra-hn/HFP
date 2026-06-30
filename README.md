@@ -38,6 +38,17 @@ To solve the instability of LLM training (loss spikes):
 - **QuantizedLR:** Instead of continuous cosine decay, the learning rate transitions through discrete "energy levels" (quanta) based on mathematical plateaus.
 - **Stiff Transient Scheduler:** Applies "stiffness" (borrowed from stiff ODE systems) to the optimizer. It allows aggressive early exploration but applies immense thermodynamic braking during fine-tuning, preventing the model from collapsing.
 
+## Theoretical Physics Foundations (The Geometry of Mind)
+
+The HFP architecture is not merely "inspired" by physics; it is a direct computational implementation of the theoretical **Hyper-Flux Projection Model**, originally developed to resolve the black hole information paradox via a 5D Gravity-Dilaton action. 
+
+The exact mapping between the theoretical physics and the neural architecture is as follows:
+
+- **5D Bulk & 4D Brane Projection $\longleftrightarrow$ O(1) Memory Compression:** In physics, the 4D universe is a projection of a 5D Bulk where information is trapped in a Stiff Transient plateau. In this AI, the local context (4D Brane) projects its data into a fixed-size `bulk_state` matrix (5D Bulk) upon entropy saturation, replacing the expanding $O(N^2)$ KV-Cache with an $O(1)$ constant memory footprint.
+- **Metric Warp Factors $\longleftrightarrow$ Witten Boundary-to-Bulk Propagator:** The extra-dimensional warp factors ($e^{2A(r)}$) governing metric contraction are implemented as the $e^{-k \cdot S}$ transition propagator, effectively shielding the deep bulk memory from chaotic, high-entropy inputs.
+- **Fokker-Planck Drift & Center Manifold $\longleftrightarrow$ Thermodynamic Context Compression:** The cubic geometric flow ($d\theta/d\tau = -\tilde{\eta}\theta^3$) that dictates information leakage (Zeno Leakage) in the physical model dictates the AI's thermodynamic trigger, compressing data deterministically based on curvature and entropy rather than blindly attending to all tokens.
+- **Holographic Principle (AdS/CFT) $\longleftrightarrow$ Ryu-Takayanagi Bound:** The AI mathematically limits the boundary network's entropy to not exceed the bulk memory's surface area, utilizing string theory's holographic entanglement entropy to physically prevent AI hallucinations.
+
 ## Quickstart & Benchmarks
 
 The architecture includes a comprehensive benchmarking suite (`benchmark.py`) to validate O(1) memory scaling and quantum-inspired schedulers.

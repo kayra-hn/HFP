@@ -31,15 +31,15 @@ def prepare_hf_repo():
         
     print("Model konfigürasyonu ve mimarisi (O(1) Memory) paketleniyor...")
     
-    # Hugging Face için konfigürasyon
+    # Hugging Face için konfigürasyon (124M GPT-2 Small Dengi)
     config = HFPConfig(
-        vocab_size=50000,
-        hidden_size=512,
-        num_hidden_layers=4,
-        num_attention_heads=8,
-        intermediate_size=2048,
-        short_len=8,
-        bulk_dim=64
+        vocab_size=50257,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        short_len=16,
+        bulk_dim=128
     )
     
     # trust_remote_code=True için zorunlu mapping (Klasör hiyerarşisi korunacak)

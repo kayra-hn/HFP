@@ -63,30 +63,26 @@ class StandardAttentionKV(nn.Module):
         return out, new_kv_cache
 
 class StandardTransformerInference(nn.Module):
-    def __init__(self, vocab_size, hidden_size, num_heads, feedforward_dim):
+    def __init__(self, vocab_size, hidden_size, num_heads, feedforward_dim, num_layers=12):
         super().__init__()
-        self.embedding = nn.Embedding(vocab_size, hidden_size)
-        self.attn = StandardAttentionKV(hidden_size, num_heads)
-        self.norm1 = nn.LayerNorm(hidden_size)
-        self.ffn = nn.Sequential(
-            nn.Linear(hidden_size, feedforward_dim),
-            nn.GELU(),
-            nn.Linear(feedforward_dim, hidden_size)
+        from transformers import GPT2Config, GPT2LMHeadModel
+        config = GPT2Config(
+            vocab_size=vocab_size,
+            n_embd=hidden_size,
+            n_head=num_heads,
+            n_layer=num_layers,
+            n_inner=feedforward_dim,
+            n_positions=8192,
+            n_ctx=8192
         )
-        self.norm2 = nn.LayerNorm(hidden_size)
-        self.lm_head = nn.Linear(hidden_size, vocab_size)
+        self.model = GPT2LMHeadModel(config)
         
-    def forward(self, x, kv_cache=None):
-        emb = self.embedding(x)
-        attn_out, new_cache = self.attn(emb, kv_cache)
-        x = self.norm1(emb + attn_out)
-        ffn_out = self.ffn(x)
-        x = self.norm2(x + ffn_out)
-        logits = self.lm_head(x)
-        return logits, new_cache
+    def forward(self, x, kv_cache=None, step=0):
+        outputs = self.model(input_ids=x, past_key_values=kv_cache, use_cache=True)
+        return outputs.logits, outputs.past_key_values
 
 class BulkTransformerInference(nn.Module):
-    def __init__(self, vocab_size, hidden_size, num_heads, feedforward_dim):
+    def __init__(self, vocab_size, hidden_size, num_heads, feedforward_dim, num_layers=12):
         super().__init__()
         from hfp.models.configuration_hfp import HFPConfig
         from hfp.models.modeling_hfp import HFPForCausalLM
@@ -94,11 +90,11 @@ class BulkTransformerInference(nn.Module):
         config = HFPConfig(
             vocab_size=vocab_size,
             hidden_size=hidden_size,
-            num_hidden_layers=1,
+            num_hidden_layers=num_layers,
             num_attention_heads=num_heads,
             intermediate_size=feedforward_dim,
-            short_len=8,
-            bulk_dim=64
+            short_len=16,
+            bulk_dim=128
         )
         self.model = HFPForCausalLM(config)
         self.bulk_state = self.model.hfp.bulk_states[0]
@@ -1096,12 +1092,13 @@ def benchmark_quantized_lr(device, gpu_name):
 # 12. Ana Çalıştırma Bloğu
 # ==========================================
 if __name__ == "__main__":
-    vocab_size = 5000
-    hidden_size = 512       
-    num_heads = 8
-    feedforward_dim = 2048
+    vocab_size = 50257
+    hidden_size = 768       
+    num_heads = 12
+    feedforward_dim = 3072
     seq_len = 4096          # GPU Çıkarım Testi
-    batch_size = 16
+    batch_size = 2          # 124M model VRAM patlamasın diye
+    num_layers = 12
     
     # Cihazı otomatik olarak tespit et
     device, gpu_name = detect_device()
@@ -1111,7 +1108,7 @@ if __name__ == "__main__":
         torch.cuda.reset_peak_memory_stats()
 
     # 1. Standart Transformer Çıkarımı
-    std_model = StandardTransformerInference(vocab_size, hidden_size, num_heads, feedforward_dim)
+    std_model = StandardTransformerInference(vocab_size, hidden_size, num_heads, feedforward_dim, num_layers)
     std_mem, std_tps, std_oom = benchmark_inference(
         std_model, device, num_steps=seq_len, batch_size=batch_size, vocab_size=vocab_size, name="Standart Transformer (KV-Cache)"
     )
@@ -1120,7 +1117,7 @@ if __name__ == "__main__":
         torch.cuda.empty_cache()
     
     # 2. Bulk Modeli Çıkarımı
-    bulk_model = BulkTransformerInference(vocab_size, hidden_size, num_heads, feedforward_dim)
+    bulk_model = BulkTransformerInference(vocab_size, hidden_size, num_heads, feedforward_dim, num_layers)
     bulk_mem, bulk_tps, bulk_oom = benchmark_inference(
         bulk_model, device, num_steps=seq_len, batch_size=batch_size, vocab_size=vocab_size, name="HFP Bulk Model"
     )
