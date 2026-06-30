@@ -17,14 +17,17 @@ class LandmarkBuffer:
     """
     def __init__(self, max_size=49):
         self.max_size = max_size
-        self.heap = []  # each entry: (strength, tensor)
+        self.heap = []  # each entry: (strength, counter, tensor)
+        self.counter = 0
 
     def clear(self):
         self.heap.clear()
+        self.counter = 0
 
     def push(self, strength, token_summary):
         # store negative strength for max-heap behavior using heapq (which is min-heap)
-        entry = (strength, token_summary.clone().detach())
+        entry = (strength, self.counter, token_summary.clone().detach())
+        self.counter += 1
         if len(self.heap) < self.max_size:
             heapq.heappush(self.heap, entry)
         else:
@@ -38,7 +41,7 @@ class LandmarkBuffer:
             return None
         # sort descending
         sorted_entries = sorted(self.heap, key=lambda e: e[0], reverse=True)
-        tensors = [e[1] for e in sorted_entries]
+        tensors = [e[2] for e in sorted_entries]
         return torch.stack(tensors, dim=1)  # shape: (batch, slots, hidden)
 
 def compute_curvature(vector: torch.Tensor) -> torch.Tensor:

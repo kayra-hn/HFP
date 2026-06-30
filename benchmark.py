@@ -85,6 +85,28 @@ class StandardTransformerInference(nn.Module):
         logits = self.lm_head(x)
         return logits, new_cache
 
+class BulkTransformerInference(nn.Module):
+    def __init__(self, vocab_size, hidden_size, num_heads, feedforward_dim):
+        super().__init__()
+        from hfp.models.configuration_hfp import HFPConfig
+        from hfp.models.modeling_hfp import HFPForCausalLM
+        
+        config = HFPConfig(
+            vocab_size=vocab_size,
+            hidden_size=hidden_size,
+            num_hidden_layers=1,
+            num_attention_heads=num_heads,
+            intermediate_size=feedforward_dim,
+            short_len=8,
+            bulk_dim=64
+        )
+        self.model = HFPForCausalLM(config)
+        self.bulk_state = self.model.hfp.bulk_states[0]
+        
+    def forward(self, x, state=None):
+        outputs = self.model(x, past_key_values=state, use_cache=True)
+        return outputs.logits, outputs.past_key_values
+
 # ==========================================
 # 3. Çıkarım Benchmark Fonksiyonu (GPU + CPU Uyumlu)
 # ==========================================
@@ -166,6 +188,8 @@ def benchmark_inference(model, device, num_steps=4096, batch_size=8, vocab_size=
                         mem_label = "VRAM" if device.type == "cuda" else "RAM"
                         raise MemoryError(f"Yapay OOM Koruması: KV-Cache {mem_label} sınırını ({oom_limit:.0f} MB) aştı!")
                     
+                    mem_usage.append((step, mem_mb))
+                    tokens_per_sec.append((step, tps))
                     start_time = time.time()
                     
             except (RuntimeError, MemoryError) as e:
@@ -1086,28 +1110,69 @@ if __name__ == "__main__":
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
 
-    # 1. Standart Transformer Çıkarımı (Yüksek VRAM Tüketimi nedeniyle devre dışı)
-    # std_model = StandardTransformerInference(vocab_size, hidden_size, num_heads, feedforward_dim)
-    # std_mem, std_tps, std_oom = benchmark_inference(
-    #     std_model, device, num_steps=seq_len, batch_size=batch_size, vocab_size=vocab_size, name="Standart Transformer (KV-Cache)"
-    # )
-    # del std_model
+    # 1. Standart Transformer Çıkarımı
+    std_model = StandardTransformerInference(vocab_size, hidden_size, num_heads, feedforward_dim)
+    std_mem, std_tps, std_oom = benchmark_inference(
+        std_model, device, num_steps=seq_len, batch_size=batch_size, vocab_size=vocab_size, name="Standart Transformer (KV-Cache)"
+    )
+    del std_model
     if device.type == "cuda":
         torch.cuda.empty_cache()
     
-    # 2. Bulk Modeli Çıkarımı (Yüksek VRAM Tüketimi nedeniyle devre dışı)
-    # bulk_model = BulkTransformerInference(vocab_size, hidden_size, num_heads, feedforward_dim)
-    # bulk_mem, bulk_tps, bulk_oom = benchmark_inference(
-    #     bulk_model, device, num_steps=seq_len, batch_size=batch_size, vocab_size=vocab_size, name="HFP Bulk Model"
-    # )
+    # 2. Bulk Modeli Çıkarımı
+    bulk_model = BulkTransformerInference(vocab_size, hidden_size, num_heads, feedforward_dim)
+    bulk_mem, bulk_tps, bulk_oom = benchmark_inference(
+        bulk_model, device, num_steps=seq_len, batch_size=batch_size, vocab_size=vocab_size, name="HFP Bulk Model"
+    )
     
     # ==========================================
-    # 6. Grafikleri Çizdirme (Sadece Schedulers Çalışacak)
+    # 6. Grafikleri Çizdirme
     # ==========================================
-    # plt.tight_layout()
-    # plot_path = os.path.join(os.path.dirname(__file__), "benchmark_results_gpu.png")
-    # plt.savefig(plot_path, dpi=150)
-    # print(f"\nGrafik başarıyla çizildi ve '{plot_path}' konumuna kaydedildi.")
+    steps_b, mem_b = zip(*bulk_mem)
+    _, tps_b = zip(*bulk_tps)
+    
+    steps_s, mem_s = zip(*std_mem)
+    _, tps_s = zip(*std_tps)
+    
+    mem_label = "VRAM" if device.type == "cuda" else "RAM"
+    
+    plt.style.use('ggplot')
+    plt.figure(figsize=(14, 6))
+    
+    # Bellek Grafiği
+    ax1 = plt.subplot(1, 2, 1)
+    ax1.plot(steps_b, mem_b, label="HFP Bulk Model (Sabit Bellek)", color='#2ca02c', linewidth=2.5)
+    ax1.plot(steps_s, mem_s, label="Standart Transformer (Büyüyen KV-Cache)", color='#1f77b4', linewidth=2.5)
+    
+    if std_oom:
+        ax1.axvline(x=std_oom, color='red', linestyle='--', linewidth=2, label='OOM Çöküşü')
+        ax1.annotate('OOM', xy=(std_oom, mem_s[-1]), xytext=(std_oom - 800, mem_s[-1] + 50),
+                     arrowprops=dict(facecolor='red', shrink=0.05), color='red', fontweight='bold', fontsize=11)
+                     
+    ax1.set_title(f"{mem_label} Kullanımı — {gpu_name}\n(seq_len={seq_len}, batch={batch_size})")
+    ax1.set_xlabel("Üretilen Token Sayısı")
+    ax1.set_ylabel(f"{mem_label} (MB)")
+    ax1.set_xlim(0, seq_len)
+    ax1.legend()
+    
+    # Hız Grafiği
+    ax2 = plt.subplot(1, 2, 2)
+    ax2.plot(steps_b, tps_b, label="HFP Bulk Model (O(1) Sabit Hız)", color='#2ca02c', linewidth=2.5)
+    ax2.plot(steps_s, tps_s, label="Standart Transformer (O(N) Yavaşlayan)", color='#1f77b4', linewidth=2.5)
+    
+    if std_oom:
+        ax2.axvline(x=std_oom, color='red', linestyle='--', linewidth=2)
+        
+    ax2.set_title(f"Çıkarım Hızı — {gpu_name}")
+    ax2.set_xlabel("Üretilen Token Sayısı")
+    ax2.set_ylabel("Hız (Token / Saniye)")
+    ax2.set_xlim(0, seq_len)
+    ax2.legend()
+    
+    plt.tight_layout()
+    plot_path = os.path.join(os.path.dirname(__file__), "benchmark_results_gpu.png")
+    plt.savefig(plot_path, dpi=150)
+    print(f"\nGrafik başarıyla çizildi ve '{plot_path}' konumuna kaydedildi.")
     
     # Yeni eklenen Stiff Zamanlayıcı Testi
     # benchmark_stiff_scheduler(device, gpu_name)

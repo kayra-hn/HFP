@@ -39,8 +39,19 @@ To solve the instability of LLM training (loss spikes):
 - **Stiff Transient Scheduler:** Applies "stiffness" (borrowed from stiff ODE systems) to the optimizer. It allows aggressive early exploration but applies immense thermodynamic braking during fine-tuning, preventing the model from collapsing.
 
 ## Quickstart & Benchmarks
-The architecture includes `benchmark_test.py` to validate tensor shape alignment, causality rules, and O(1) memory stability without requiring model weights to be fully trained.
 
+The architecture includes a comprehensive benchmarking suite (`benchmark.py`) to validate O(1) memory scaling and quantum-inspired schedulers.
+
+To run the full GPU memory benchmark and generate the O(1) vs KV-Cache comparison:
+```bash
+python benchmark.py
+```
+
+### O(1) Memory Proof
+*(The script generates `benchmark_results_gpu.png` demonstrating constant VRAM consumption for effectively infinite context lengths.)*
+![HFP O(1) Memory Benchmark](benchmark_results_gpu.png)
+
+To run a quick shape and causality test without generating graphs:
 ```bash
 python benchmark_test.py
 ```
