@@ -35,4 +35,21 @@ class HFPConfig(PretrainedConfig):
         self.medium_freq = medium_freq
         self.long_freq = long_freq
         self.medium_momentum = medium_momentum
+        self.ENABLE_COHERENCE = kwargs.pop("ENABLE_COHERENCE", False)
         super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
+
+    @classmethod
+    def from_1b_profile(cls, vocab_size=50257):
+        """
+        Creates a 1 Billion Parameter configuration for Cloud Training.
+        """
+        return cls(
+            vocab_size=vocab_size,
+            hidden_size=2048,
+            num_hidden_layers=24,
+            num_attention_heads=16,
+            intermediate_size=8192,
+            bulk_dim=512,
+            short_len=64,
+            ENABLE_COHERENCE=False
+        )
