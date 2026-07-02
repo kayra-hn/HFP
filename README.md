@@ -37,9 +37,13 @@ To definitively prove that the $O(1)$ memory mechanism scales to production leve
 ![VRAM Benchmark](https://huggingface.co/kayrahan35/HFP-O1-Memory-Model/resolve/main/benchmark_results_gpu.png)
 As demonstrated in the memory footprint analysis up to 4096 tokens, the standard KV-Cache approach rapidly consumes VRAM (scaling at $O(N)$), ultimately risking Out-Of-Memory (OOM) crashes. Conversely, the HFP architecture utilizes a robust physical mechanism to maintain a perfectly flat, horizontal line at exactly **744.40 MB** regardless of sequence length. 
 
-### 2. Linguistic Quality & Perplexity (PPL)
-![Quality Benchmark](https://huggingface.co/kayrahan35/HFP-O1-Memory-Model/resolve/main/benchmark_quality_results.png)
-A persistent critique of fixed-memory models is the potential loss of signal or linguistic degradation. To address this, the HFP architecture was rigorously tested against a standard Transformer KV-Cache model on identical text patterns. As the graph clearly illustrates, the HFP model's Cross-Entropy Loss and Perplexity converge almost identically to the standard Transformer. The thermodynamic compression actively preserves language structure, ensuring **zero degradation in text quality** compared to classical O(N^2) models.
+### 2. Passkey Retrieval & OOM Prevention (100K Tokens)
+![Passkey Benchmark](https://huggingface.co/kayrahan35/HFP-O1-Memory-Model/resolve/main/passkey_1b_results.png)
+To prove the architecture does not crash and handles infinite context without memory growth, a 1B scale model was tested on a 100,000-token input. As proven mathematically, the GPU RAM remains strictly flat without Out of Memory (OOM) errors, showcasing pure $O(1)$ stability.
+
+### 3. Thermodynamic Optimizer Stability (Crash Test)
+![Optimizer Benchmark](https://huggingface.co/kayrahan35/HFP-O1-Memory-Model/resolve/main/optimizer_stability_results.png)
+A notorious issue in training 100B+ models is "Gradient Explosion". We tested a standard `AdamW` optimizer against our custom `AdamW_Thermodynamic` under extreme stress ($LR=0.5$). Standard AdamW immediately exploded into `NaN` (Network Death). Our Thermodynamic optimizer successfully detected the stiff manifold, dynamically dampened the learning rate via Boltzmann distribution, and survived the crash test.
 
 ## Architectural Breakthroughs
 
