@@ -23,9 +23,7 @@ venv.bak/
 # Project specific
 trained_hfp_baby/
 hfp_hf_test_save/
-benchmark_results*.png
-passkey_results.png
-
+benchmark_*.txt
 hfp_upload_temp/
 error.log
 hfp_hf_test_save/
