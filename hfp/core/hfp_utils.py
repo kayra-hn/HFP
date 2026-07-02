@@ -100,27 +100,21 @@ def conservation_check(state: torch.Tensor) -> bool:
     drift = torch.abs(temporal_sum[:, 1:] - temporal_sum[:, :-1])
     return torch.all(drift < eps).item()
 
-def compute_5d_curvature(short_mem: torch.Tensor, medium_mem: torch.Tensor, long_mem: torch.Tensor) -> torch.Tensor:
+def holographic_information_bound(entropy_val: torch.Tensor, memory_matrix: torch.Tensor) -> torch.Tensor:
     """
-    Computes a simplified Ricci scaler proxy across both time (sequence) and depth (radial dimension).
+    Holographic Information Bound (V2.1):
+    Ensures that the entropy of the current attention distribution does not exceed 
+    the theoretical capacity (Frobenius norm) of the [hidden, hidden] Associative Memory Matrix.
     """
-    temporal_curv = compute_curvature(short_mem)
-    if short_mem is not None and short_mem.size(1) > 0:
-        short_mean = short_mem.mean(dim=1)
-    else:
-        short_mean = torch.zeros_like(medium_mem)
-        
-    radial_diff1 = medium_mem - short_mean
-    radial_diff2 = long_mem - medium_mem
-    radial_curv = torch.norm(radial_diff2 - radial_diff1, dim=-1).mean()
-    return temporal_curv + radial_curv
-
-def ryu_takayanagi_loss(entropy_val: torch.Tensor, long_mem: torch.Tensor, G_const: float = 1.0) -> torch.Tensor:
-    """
-    Ryu-Takayanagi Bound: Penalizes boundary entropy if it exceeds proportional bulk area.
-    """
-    bulk_area = torch.norm(long_mem, dim=-1).mean()
-    bound_violation = torch.relu(entropy_val - (bulk_area / (4 * G_const)))
+    # Calculate Frobenius norm over the matrix dimensions ONLY (dim -2 and -1), not batch.
+    # memory_matrix is [batch, hidden, hidden]
+    matrix_capacity = torch.linalg.matrix_norm(memory_matrix, ord='fro', dim=(-2, -1)).mean()
+    
+    # Soft Penalty (Log-Barrier / Softplus approach) instead of dead ReLU
+    # capacity ratio
+    ratio = entropy_val / (matrix_capacity + 1e-8)
+    
+    # Softplus ensures gradients always flow smoothly (no dead ReLU).
+    # It penalizes heavily if entropy approaches or exceeds capacity.
+    bound_violation = torch.nn.functional.softplus(ratio - 1.0)
     return bound_violation
-
-
