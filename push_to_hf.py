@@ -74,19 +74,19 @@ def prepare_hf_repo():
         commit_message="Initial commit: O(1) Memory HFP Architecture Core"
     )
     
-    print("Grafikler ve Benchmark sonuçları yükleniyor...")
-    # Grafiği Yükle
-    for img in ["benchmark_results_gpu.png", "benchmark_results_wikitext2.png"]:
-        if os.path.exists(img):
+    print("Grafikler, Benchmark sonuçları ve Model Kartı (README) yükleniyor...")
+    # Dosyaları Yükle
+    for filename in ["benchmark_results_gpu.png", "benchmark_results_wikitext2.png", "passkey_1b_results.png", "README.md"]:
+        if os.path.exists(filename):
             try:
                 api.upload_file(
-                    path_or_fileobj=img,
-                    path_in_repo=img,
+                    path_or_fileobj=filename,
+                    path_in_repo=filename,
                     repo_id=repo_id,
                     repo_type="model"
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Uyarı: {filename} yüklenemedi: {e}")
         
     print("\n" + "="*50)
     print("🚀 YÜKLEME BAŞARILI! 🚀")
