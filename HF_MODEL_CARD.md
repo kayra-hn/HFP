@@ -45,21 +45,20 @@ A persistent critique of fixed-memory models is the potential loss of signal or 
 
 The HFP architecture abandons conventional ad-hoc regularizations in favor of strict mathematical/physical analogues:
 
-### 1. Thermodynamic Context Compression & O(1) Memory
-Unlike continuous linear attention (e.g., Infini-attention) which blindly compresses data, HFP employs an **active thermodynamic trigger**. The short-term memory is constantly evaluated for its **Entropy ($S$)** and **Curvature ($R$)**. 
-- Once the entropy of the current cognitive state reaches a saturation threshold, the `bulk_trigger` activates, compressing the local context into a high-dimensional `bulk_state` (Long-term memory).
+### 1. Thermodynamic Context Compression & O(1) Memory Matrix
+Unlike continuous linear attention (e.g., Infini-attention) which suffers from catastrophic interference and crosstalk, HFP V2.1 employs an **Active Memory Decay (Forget Gate)** combined with pure orthogonal projections ($W_q, W_k, W_v$). 
+- As new tokens arrive, irrelevant matrix signals are siphoned off dynamically via a learned $\gamma$ gate, ensuring the 16-million parameter associative matrix (`[hidden_size, hidden_size]`) never reaches rank collapse.
 - **HPC Implication:** The memory update mechanism operates strictly in $O(1)$ time and space per block. The model can process effectively infinite context sizes with a constant, highly compressed VRAM footprint on single consumer GPUs.
 
-### 2. Dual-Masked Self-Cross Attention
-To prevent "Causal Leakage" (predicting the future) while maintaining access to historical deep memory, HFP uses a custom Dual-Mask attention topology:
-- **Local Context:** Strict Triangular Causal Mask prevents tokens from attending to future tokens.
-- **Deep Context:** Full Matrix Mask allows total, unhindered read-access to the 5D historical bulk memory.
+### 2. Thermodynamic Optimizer (AdamW-Thermo)
+To prevent the catastrophic gradient freezing inherent to 200B+ models during long-context training, HFP introduces **AdamW_Thermodynamic**.
+- Inherits AdamW's variance and momentum statistics but replaces standard clipping with a **Boltzmann-distributed learning rate damping mechanism** ($e^{-E/kT}$).
+- Features a mathematically guaranteed lower bound (`clamp(0.1)`) to ensure the optimizer smoothly navigates stiff manifolds without ever vanishing into $0$ gradients.
 
-### 3. Physics-Informed Internal State (Holographic Principle)
+### 3. Physics-Informed Regularization (Holographic Bound)
 The architecture introduces non-standard tracking variables directly influenced by physical laws:
-- **5D Radial Curvature:** Measures the second derivative across *memory depth* (Short $\rightarrow$ Medium $\rightarrow$ Long) calculating a Ricci-scalar proxy to regulate internal "gravity."
-- **Witten Boundary-to-Bulk Propagator:** Information transition is modulated by a warp factor $e^{-k \cdot S}$, physically shielding the deep bulk from noisy inputs.
-- **Ryu-Takayanagi Entropy Bound:** Enforces a strict mathematical bound ensuring the entropy of the boundary cannot exceed the surface area of the bulk.
+- **Ryu-Takayanagi Entropy Bound:** Enforces a strict mathematical bound ensuring the entropy of the attention distribution cannot exceed the Frobenius norm capacity of the Bulk matrix.
+- **Dimension-Independent Soft Penalty:** Calculates the matrix norm strictly on `dim=(-2, -1)` independent of batch size, and utilizes a continuous `softplus` penalty flow to ensure backpropagation is never killed.
 
 ## Commercial & Hardware Advantages (The Billion-Dollar Paradigm Shift)
 
