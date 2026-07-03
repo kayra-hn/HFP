@@ -44,7 +44,7 @@ class HFPModel(HFPPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
-        self.pos_encoder = SinusoidalPositionalEncoding(config.hidden_size)
+        self.pos_encoder = SinusoidalPositionalEncoding(config.hidden_size, max_len=config.max_position_embeddings)
         
         self.layers = nn.ModuleList([
             BulkTriggerDecoderLayer(
