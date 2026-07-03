@@ -7,8 +7,8 @@ tags:
 - o1-memory
 - hfp
 - thermodynamics
-- apache-2.0
-license: apache-2.0
+- agpl
+license: agpl-3.0
 language:
 - en
 ---
@@ -113,5 +113,6 @@ The HFP AI architecture is a direct computational simulation of these quantum gr
 - **Fokker-Planck Flow & Center Manifold $\longleftrightarrow$ Thermodynamic Context Compression:** The cubic flow equation ($d\theta/d\tau = -\tilde{\eta}\theta^3$) that dictates information drift in the physical model is simulated by the AI's active thermodynamic trigger, which compresses context only when cognitive entropy ($S$) saturates.
 - **Holographic Principle (AdS/CFT) $\longleftrightarrow$ Ryu-Takayanagi Entropy Bound:** Just as the physics model aligns boundary quantum states with bulk gravity, the AI mathematically limits the short-term network's entropy to not exceed the long-term matrix's surface area, preventing hallucinations via fundamental physical bounds.
 
-## License (Apache 2.0)
-This architecture is proudly open-sourced under the **Apache 2.0 License**. This permissive license allows for unrestricted commercial deployment, modification, and internal use (perfectly aligned with corporate adoption requirements).
+## License (GNU AGPL v3)
+This architecture is proudly open-sourced under the **AGPL v3.0 License**. 
+*Note: Any commercial entities deploying this architecture (or its derivatives) over a network (e.g., as a SaaS or API endpoint) are legally required to open-source their modifications under the same license.*
