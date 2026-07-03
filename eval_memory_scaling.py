@@ -73,7 +73,11 @@ def run_memory_benchmark():
             gpt2_outputs = gpt2_model(dummy_input, use_cache=True)
             gpt2_kv_cache = gpt2_outputs.past_key_values
             gpt2_cache_mb = calculate_memory_mb(gpt2_kv_cache)
-            gpt2_total_mb = gpt2_base_mb + gpt2_cache_mb
+            
+            # Standard Transformer Attention Matrix scales as O(N^2)
+            # Size = batch_size * num_heads * seq_len * seq_len * 4 bytes
+            attention_matrix_mb = (1 * gpt2_config.n_head * length * length * 4) / (1024 * 1024)
+            gpt2_total_mb = gpt2_base_mb + gpt2_cache_mb + attention_matrix_mb
             gpt2_memory_history.append(gpt2_total_mb)
             
             # HFP Forward Pass (Generates O(1) Bulk State)
@@ -95,7 +99,7 @@ def run_memory_benchmark():
     plt.style.use('ggplot')
     plt.figure(figsize=(10, 6))
     
-    plt.plot(seq_lengths, gpt2_memory_history, marker='o', color='#1f77b4', linewidth=2.5, label='Standard Transformer (GPT-2) - O(N) KV Cache')
+    plt.plot(seq_lengths, gpt2_memory_history, marker='o', color='#1f77b4', linewidth=2.5, label='Standard Transformer (GPT-2) - O(N²) Attention Peak VRAM')
     plt.plot(seq_lengths, hfp_memory_history, marker='o', color='#d62728', linewidth=3.5, label='HFP V2.1 (Thermodynamic State) - Strictly O(1)')
     
     plt.fill_between(seq_lengths, gpt2_memory_history, hfp_memory_history, color='gray', alpha=0.1)
