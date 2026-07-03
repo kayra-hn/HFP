@@ -76,7 +76,7 @@ def prepare_hf_repo():
     
     print("Grafikler, Benchmark sonuçları ve Model Kartı (README) yükleniyor...")
     # Dosyaları Yükle
-    for filename in ["benchmark_results_gpu.png", "optimizer_stability_results.png", "passkey_1b_results.png", "README.md"]:
+    for filename in ["benchmark_results_gpu.png", "optimizer_stability_results.png", "passkey_1b_results.png", "README.md", "LICENSE"]:
         if os.path.exists(filename):
             try:
                 api.upload_file(
