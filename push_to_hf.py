@@ -39,7 +39,8 @@ def prepare_hf_repo():
         num_attention_heads=12,
         intermediate_size=3072,
         short_len=16,
-        bulk_dim=128
+        bulk_dim=128,
+        max_position_embeddings=8192
     )
     
     # trust_remote_code=True için zorunlu mapping (Klasör hiyerarşisi korunacak)
