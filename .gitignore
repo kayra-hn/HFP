@@ -27,3 +27,35 @@ benchmark_*.txt
 hfp_upload_temp/
 error.log
 hfp_hf_test_save/
+
+# Generated experiment outputs (never commit)
+checkpoints/                   # HFP_CKPT_DIR default; run artifacts
+review_scripts/*_results.txt   # sweep/dense/baseline/pure-memory result logs
+sweep_results.txt
+
+# Internal / legacy — not for the public repo
+FABLE_GOREV_PROMPT.md          # internal review-agent prompt (contains local paths)
+INCELEME_BRIFINGI.md           # internal review-agent brief (contains local paths)
+_legacy_reference/             # orphaned old model kept only for local diffing
+tinyshakespeare.txt            # dataset — fetch separately, don't commit
+osf_companion_v22.tex          # transient build copy (see osf_companion.tex)
+
+# NOTE: review_scripts/ is now TRACKED (was fully ignored). The reproduction
+# scripts (verify_claims.py, dense_retention.py, length_gen.py,
+# interference_eval.py, baseline_compare.py, pure_memory_ablation.py,
+# run_remaining_experiments.sh) are cited publicly by RESULTS.md and
+# osf_companion.tex, so they belong in the repo. Only their generated outputs
+# (above) stay ignored.
+
+# --- reroot temizligi: yayinlanmaz ---
+_archive_old/
+_legacy_reference/
+hf_upload/
+*.safetensors
+osf_companion_v22.tex
+COMMIT_STEPS.md
+DUZELTME_PLANI.md
+REPO_STRUCTURE.md
+OSF_GUNCELLEME_NOTU.md
+YAYINLAMA_TALIMATI.md
+DEGISIKLIKLER.md

@@ -1,0 +1,43 @@
+name: HFP regression tests
+
+# Bagimsiz incelemenin (INCELEME_RAPORU.md) onerisi: smoke_test + verify_claims
+# CI'ya baglansin. cubic/dpfp yollari smoke_test'te kapsanmiyordu; verify_claims
+# o bosluklari (chunk-tutarlilik, causal dogruluk, kubik ODE kesinligi) kapatir.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install CPU deps
+        run: |
+          python -m pip install --upgrade pip
+          # CPU-only torch (CI'da GPU yok); transformers + numpy cekirdek bagimliliklar
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install "transformers>=4.40" numpy
+
+      - name: Regression tests (smoke_test)
+        run: python smoke_test.py
+
+      - name: Verification suite (chunk-consistency, causal, cubic exactness)
+        run: python review_scripts/verify_claims.py
+
+      - name: Byte-compile all sources (no syntax errors / merge markers)
+        run: |
+          python -m compileall -q hfp review_scripts *.py
+          # merge conflict isaretcisi kalmadigini garanti et
+          ! grep -rnE '^(<<<<<<<|=======|>>>>>>>)' --include=*.py . || (echo "merge markers found" && exit 1)

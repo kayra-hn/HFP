@@ -1,118 +1,181 @@
 ---
+license: agpl-3.0
+library_name: transformers
 tags:
-- custom_code
 - pytorch
 - causal-lm
-- physics-informed-neural-networks
+- linear-attention
+- long-context
 - o1-memory
 - hfp
-- thermodynamics
-- agpl
-license: agpl-3.0
 language:
 - en
 ---
 
-# Hyper Flux Projection (HFP) - The O(1) Memory Paradigm
+# HFP — Hyper-Flux Projection
 
-<div align="center">
-  <img src="https://huggingface.co/kayrahan35/HFP-O1-Memory-Model/resolve/main/benchmark_results_gpu.png" width="800"/>
-</div>
+An experimental causal language-model architecture that pairs **windowed local
+attention** with a **per-layer recurrent memory** (a decayed linear-attention
+state `M ∈ ℝ^{H×H}`, `z ∈ ℝ^H`). The inference-time state is **constant in
+context length** — O(1) memory instead of a growing KV-cache — and long-range
+information is forced to travel through that recurrent memory.
 
-<br>
+Its distinguishing feature is the **retention law** of that memory. Alongside the
+standard exponential decay used by every efficient recurrent model (RetNet, GLA,
+Mamba, …), HFP implements a **cubic-plateau decay** derived from the Hyper-Flux
+Projection physics papers, and lets you switch between them with a single flag.
 
-**HFP (Hyper Flux Projection)** is a fundamentally novel, physics-inspired neural network architecture designed for causal language modeling. It achieves the "Holy Grail" of long-context LLMs: **Strictly O(1) Constant VRAM Scaling**, effectively eliminating the quadratic $O(N^2)$ memory bottleneck of standard KV-Cache systems.
+> **Honesty note.** HFP is *inspired by* the HFP physics papers (5D→4D
+> projection, moduli memory). The code is **not** a simulation or isomorphism of
+> that physics — the mapping is an analogy that motivated design choices. Every
+> claim here is an ML claim, to be established by the experiments below. The
+> physics is not validated by the model, and the model is not evidence for the
+> physics.
 
-By introducing advanced thermodynamic concepts into the standard Transformer architecture, HFP forces the latent representations to obey mathematical conservation laws, preventing hallucinations and context degradation.
+## The idea: retention law as the design axis
 
-## Performance & Benchmarks (124M Scale)
+A fixed-size recurrent memory must forget. *How* it forgets is the design choice.
 
-> [!IMPORTANT]
-> **Clarification on Weights vs. Benchmarks:** The weights provided in this repository are **untrained (Architecture only)**. The purpose of this repository is to open-source the `HFPForCausalLM` architecture. 
-> The performance graphs shown below are the results of controlled, isolated academic benchmarks trained from scratch using this exact architecture to mathematically prove its $O(1)$ memory scaling and learning capabilities against a standard Transformer.
+- **`exp` (baseline).** Geometric decay, `M_t = λ⊙M_{t-1} + k_t v_tᵀ`, with a
+  learned per-channel `λ = σ(decay)`. This is the only envelope that folds into
+  an exact O(1) state (`g(t−j)=G(t)/G(j)` composability), which is why the whole
+  efficient-recurrent family uses it.
 
-To definitively prove that the $O(1)$ memory mechanism scales to production levels without degrading linguistic quality, the architecture was benchmarked at a **124M Parameter (GPT-2 Small Equivalent)** configuration (12 Layers, 768 Hidden Size, 12 Heads).
+- **`cubic_flux` (HFP).** A direct discretization of the paper's cubic relaxation
+  `dθ/dτ = −η·θ³`. The stable single-step solution gives a **state-magnitude
+  dependent** decay factor:
 
-### 1. VRAM Scaling (Memory)
-![VRAM Benchmark](https://huggingface.co/kayrahan35/HFP-O1-Memory-Model/resolve/main/benchmark_results_gpu.png)
-As demonstrated in the memory footprint analysis up to 4096 tokens, the standard KV-Cache approach rapidly consumes VRAM (scaling at $O(N)$), ultimately risking Out-Of-Memory (OOM) crashes. Conversely, the HFP architecture utilizes a robust physical mechanism to maintain a perfectly flat, horizontal line at exactly **744.40 MB** regardless of sequence length. 
+  ```
+  λ_t = 1 / sqrt(1 + 2·η·s_t²)        # s_t = current per-channel state magnitude
+  ```
 
-### 2. Passkey Retrieval & OOM Prevention (100K Tokens)
-![Passkey Benchmark](https://huggingface.co/kayrahan35/HFP-O1-Memory-Model/resolve/main/passkey_1b_results.png)
-To prove the architecture does not crash and handles infinite context without memory growth, a 1B scale model was tested on a 100,000-token input. As proven mathematically, the GPU RAM remains strictly flat without Out of Memory (OOM) errors, showcasing pure $O(1)$ stability.
+  When a channel is nearly empty (`s→0`) it barely decays (**plateau, no
+  forgetting**); when it fills up it decays in proportion to its magnitude
+  (**active, self-limiting forgetting**). The result is a *plateau then
+  power-law* retention envelope rather than a geometric cliff — a mechanism that,
+  to our knowledge, no mainstream recurrent model uses. `η` is a learned
+  per-channel "flux" parameter.
 
-### 3. Thermodynamic Optimizer Stability (Crash Test)
-![Optimizer Benchmark](https://huggingface.co/kayrahan35/HFP-O1-Memory-Model/resolve/main/optimizer_stability_results.png)
-A notorious issue in training 100B+ models is "Gradient Explosion". We tested a standard `AdamW` optimizer against our custom `AdamW_Thermodynamic` under extreme stress ($LR=0.5$). Standard AdamW immediately exploded into `NaN` (Network Death). Our Thermodynamic optimizer successfully detected the stiff manifold, dynamically dampened the learning rate via Boltzmann distribution, and survived the crash test.
+Set the mode with `decay_mode="exp"` / `"cubic_flux"` (config) or
+`--decay_mode` (CLI). Everything else is held identical, so the two modes are a
+clean controlled comparison of the retention law alone.
 
-## Architectural Breakthroughs
+## Architecture
 
-The HFP architecture abandons conventional ad-hoc regularizations in favor of strict mathematical/physical analogues:
+- **Recurrent memory (per layer).** Causal, chunkwise, causal-inclusive linear
+  attention: every token reads the cumulative state (its own KV included), so the
+  memory path is trained end-to-end by the LM loss. Chunked streaming and a
+  single-shot forward are mathematically identical (checked by `smoke_test.py`);
+  both retention modes are chunk-consistent.
+- **Binding convolution.** A short depthwise **causal conv** (kernel 3) on the
+  Q/K pathway mixes each token with its predecessors, so a value's key encodes
+  the key that preceded it. This is what makes associative recall possible in a
+  linear-attention memory (cf. Mamba/H3/Based); values are read from the clean,
+  un-convolved input. It is orthogonal to the retention law and applies in both
+  modes. Set `conv_kernel=1` to ablate it.
+- **Windowed local attention.** Multi-head attention restricted to a sliding
+  window (`local_window`); long-range information must flow through the recurrent
+  memory. `local_window=None` gives full causal attention.
+- **Embedding / positional balance.** Token embeddings are scaled by `√d` and the
+  sinusoidal positional encoding by `pe_scale` (default 0.3) so token content is
+  not drowned by position — a prerequisite for content-based recall.
+- **EntangledLinear FFN.** The two FFN projections are generated from a single
+  shared bulk weight (`P_A·W_bulk`, `P_B·W_bulk`) — a parameter-tying scheme
+  motivated by the papers' "two shadows of one bulk vector" picture.
 
-### 1. Thermodynamic Context Compression & O(1) Memory Matrix
-Unlike continuous linear attention (e.g., Infini-attention) which suffers from catastrophic interference and crosstalk, HFP V2.1 employs an **Active Memory Decay (Forget Gate)** combined with pure orthogonal projections ($W_q, W_k, W_v$). 
-- As new tokens arrive, irrelevant matrix signals are siphoned off dynamically via a learned $\gamma$ gate, ensuring the 16-million parameter associative matrix (`[hidden_size, hidden_size]`) never reaches rank collapse.
-- **HPC Implication:** The memory update mechanism operates strictly in $O(1)$ time and space per block. The model can process effectively infinite context sizes with a constant, highly compressed VRAM footprint on single consumer GPUs.
+## Status of results
 
-### 2. Thermodynamic Optimizer (AdamW-Thermo)
-To prevent the catastrophic gradient freezing inherent to 200B+ models during long-context training, HFP introduces **AdamW_Thermodynamic**.
-- Inherits AdamW's variance and momentum statistics but replaces standard clipping with a **Boltzmann-distributed learning rate damping mechanism** ($e^{-E/kT}$).
-- Features a mathematically guaranteed lower bound (`clamp(0.1)`) to ensure the optimizer smoothly navigates stiff manifolds without ever vanishing into $0$ gradients.
+See **[RESULTS.md](RESULTS.md)** for the full, multi-seed experimental record.
+Headline findings (small scale, synthetic recall; patterns are seed-robust):
 
-### 3. Physics-Informed Regularization (Holographic Bound)
-The architecture introduces non-standard tracking variables directly influenced by physical laws:
-- **Ryu-Takayanagi Entropy Bound:** Enforces a strict mathematical bound ensuring the entropy of the attention distribution cannot exceed the Frobenius norm capacity of the Bulk matrix.
-- **Dimension-Independent Soft Penalty:** Calculates the matrix norm strictly on `dim=(-2, -1)` independent of batch size, and utilizes a continuous `softplus` penalty flow to ensure backpropagation is never killed.
+- **Length generalization**: models trained at 160 tokens transfer to 1280-token
+  streams (8x), with fixed-gap recall *improving* as fact density falls.
+  Train-short / infer-long is the supported deployment mode of the O(1) state.
+- **The memory is interference-limited**, not decay-limited, in the tested regime.
+- **DPFP capacity axis** (`key_feature_map="dpfp"`) is the first mechanism with a
+  clear, 3-seed advantage: ~2-6x baseline accuracy at long gaps under high
+  interference, and it stabilizes training across seeds.
+- **Recommended configuration**: `exp` decay + additive writes + `dpfp` features +
+  `ffn_type="standard"`, dense multi-query training data.
+- `cubic_flux` currently trails the exponential baseline at this scale and is
+  parked as a long-horizon hypothesis (exact parallel form implemented).
+  No LM-benchmark claims are made yet.
 
-## Commercial & Hardware Advantages (The Billion-Dollar Paradigm Shift)
-
-The elimination of the KV-Cache bottleneck translates directly to massive hardware and operational cost reductions:
-- **Zero VRAM Spikes (Cost Efficiency):** Traditional LLMs require clusters of highly expensive GPUs (e.g., A100/H100) purely to hold the KV-Cache for long contexts. HFP operates with a fixed memory footprint regardless of context length, drastically reducing the hardware requirements.
-- **Edge Computing & CPU Inference Potential:** Because memory is strictly $O(1)$ and deeply compressed, HFP architectures can easily run inference for infinitely long contexts on standard CPUs, local servers, and Edge devices (mobile phones, IoT) without crashing due to RAM exhaustion.
-- **Sustainable AI Operations:** Constant memory scaling means predictable cloud hosting bills and lower power consumption, paving the way for sustainable, infinitely-running AI agents.
-
-## Training Strategy for 1B+ Parameter Models
-
-A common question regarding fixed-memory models is how they scale during the training phase. It is crucial to distinguish between **Inference** and **Training**:
-
-1. **O(1) Memory applies to KV-Cache (Inference & Forward Pass):** The HFP architecture strictly caps memory growth during generation by continuously compressing context into the `bulk_state`. 
-2. **Training Memory (Autograd):** During backpropagation, PyTorch must store activation graphs for gradient calculation. This inherently scales with sequence length $O(L)$ for any model. 
-3. **Scaling to 1B+ Parameters:** To train a 1B parameter HFP model on consumer GPUs (e.g., 24GB VRAM), we utilize:
-   - **Gradient Checkpointing:** Trades compute for memory by re-calculating activations during the backward pass.
-   - **8-bit Optimizers (e.g., bitsandbytes AdamW):** Reduces optimizer state memory by 75%.
-   - **Micro-batching & Chunking:** Because the HFP architecture utilizes a `bulk_state` (Long-term memory) that naturally persists across sequence boundaries, training data can be fed in truncated chunks (Truncated BPTT). The model maintains historical context through the bulk state without needing a massive continuous sequence in the autograd graph.
-
-## Usage & Implementation
-
-Because this model introduces a completely novel architecture (`HFPForCausalLM`), you **must** use `trust_remote_code=True` to load it. The custom Python code (`modeling_hfp.py`, `configuration_hfp.py`, etc.) is bundled within this repository.
+## Usage
 
 ```python
-import torch
-from transformers import AutoModelForCausalLM, AutoConfig
+from hfp.models.configuration_hfp import HFPConfig
+from hfp.models.modeling_hfp import HFPForCausalLM
 
-# Load the HFP Architecture (Untrained weights - Architecture only)
-model = AutoModelForCausalLM.from_pretrained(
-    "kayrahan35/HFP-O1-Memory-Model", 
-    trust_remote_code=True,
-    device_map="auto"
-)
-
-# Verify the O(1) Bulk State Initialization
-print(f"Model Parameters: {model.num_parameters():,}")
-print(f"Architecture: {model.config.architectures[0]}")
+config = HFPConfig(vocab_size=50257, hidden_size=256, num_hidden_layers=4,
+                   num_attention_heads=4, local_window=64,
+                   decay_mode="cubic_flux")   # or "exp"
+model = HFPForCausalLM(config)
 ```
 
-## Scientific Foundations & Physics-AI Connections
-The theoretical physics foundation and formal proofs of this architecture are documented in the original research papers on the Hyper-Flux Projection Model (Gravity-Dilaton Action and Quantum Geometry).
-🔗 **[Hyper Flux Projection Theory (OSF Preprint)](https://osf.io/xc7e4)**
+Streaming inference with constant memory:
 
-The HFP AI architecture is a direct computational simulation of these quantum gravity and black hole information paradox resolutions. The core physics concepts map directly to the AI's neural mechanisms:
+```python
+past = None
+for chunk in token_chunks:                    # e.g. 256-token chunks
+    out = model(chunk, past_key_values=past, use_cache=True)
+    past = out.past_key_values                # fixed-size state, does not grow
+```
 
-- **5D Bulk & 4D Brane Projection $\longleftrightarrow$ O(1) Memory Compression:** In the theoretical model, the 4D universe is a projection of a 5D Bulk where information is stored in a geometric plateau (Stiff Transient) without loss. In the AI, the expanding local context (4D Brane) is compressed into a fixed-size `bulk_state` (5D Bulk), achieving constant $O(1)$ VRAM scaling.
-- **Metric Warp Factors $\longleftrightarrow$ Witten Boundary-to-Bulk Propagator:** The physical warp factors ($e^{2A(r)}$) that govern information transition across extra dimensions are computationally implemented as the $e^{-k \cdot S}$ warp factor, shielding the deep bulk memory from chaotic input tokens.
-- **Fokker-Planck Flow & Center Manifold $\longleftrightarrow$ Thermodynamic Context Compression:** The cubic flow equation ($d\theta/d\tau = -\tilde{\eta}\theta^3$) that dictates information drift in the physical model is simulated by the AI's active thermodynamic trigger, which compresses context only when cognitive entropy ($S$) saturates.
-- **Holographic Principle (AdS/CFT) $\longleftrightarrow$ Ryu-Takayanagi Entropy Bound:** Just as the physics model aligns boundary quantum states with bulk gravity, the AI mathematically limits the short-term network's entropy to not exceed the long-term matrix's surface area, preventing hallucinations via fundamental physical bounds.
+## Experiments
 
-## License (GNU AGPL v3)
-This architecture is proudly open-sourced under the **AGPL v3.0 License**. 
-*Note: Any commercial entities deploying this architecture (or its derivatives) over a network (e.g., as a SaaS or API endpoint) are legally required to open-source their modifications under the same license.*
+```bash
+python smoke_test.py            # regression tests — run first, before trusting anything
+
+# Long-range recall A/B (the headline comparison)
+python run_experiment.py --task retention --steps 1500 --context 96 \
+    --max_gap 64 --local_window 16 --decay_mode exp
+python run_experiment.py --task retention --steps 1500 --context 96 \
+    --max_gap 64 --local_window 16 --decay_mode cubic_flux
+
+# Language modeling
+python run_experiment.py --task lm --steps 1500 --seq 128 --decay_mode cubic_flux
+
+# MQAR recall with chunked-vs-reset ablation
+python run_experiment.py --task recall --steps 1500 --context 128 --pairs 8
+```
+
+`smoke_test.py` covers: gradient flow through all memory parameters, MQAR
+label alignment, chunk-consistency of both retention modes, and cached
+generation. Note: `cubic_flux` uses a sequential scan (O(L)); it is slower than
+the parallel `exp` path and best run on GPU.
+
+## Repository layout
+
+```
+hfp/core/hfp_bulk_state.py        recurrent memory: M,z state, exp + cubic_flux decay, binding conv
+hfp/core/bulk_trigger_decoder.py  decoder layer: windowed attention + EntangledFFN
+hfp/models/modeling_hfp.py        HuggingFace-compatible model
+hfp/models/configuration_hfp.py   config
+run_experiment.py                 retention / recall / lm experiments
+smoke_test.py                     regression tests
+train.py                          standard AdamW training loop
+```
+
+## Papers, companion note, and honest status
+
+The physics preprints and an empirical companion note (compiled from this repo's
+results) live on OSF: <https://osf.io/xc7e4>. The companion
+(`osf_companion.pdf`) and [`RESULTS.md`](RESULTS.md) are the authoritative,
+multi-seed record of what is and is not claimed.
+
+**This description supersedes any earlier, marketing-styled summary of HFP.**
+Physics is *inspiration* for design choices, not a validated mechanism: there is
+no active "Ryu–Takayanagi bound", "Witten propagator", "5D curvature" or
+"quantized-energy scheduler" in the trained path — those diagnostics are optional
+and off by default (see the honesty note above). The only architecture-level
+results demonstrated so far are the **DPFP capacity axis** and **train-short /
+infer-long length generalization** (multi-seed; `RESULTS.md`). `cubic_flux`
+trails the exponential baseline at the tested scale and is parked as a
+long-horizon hypothesis. No language-model benchmark claim is made.
+
+## License
+
+GNU AGPL v3.0. Commercial network deployment of this architecture or derivatives
+requires open-sourcing modifications under the same license. Code is AGPL-3.0;
+the OSF text/figures are licensed separately (see the OSF project).

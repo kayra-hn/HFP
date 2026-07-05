@@ -1,127 +1,197 @@
+# Hyper Flux Projection (HFP) — O(1)-memory causal language model
+# Copyright (C) 2026 Kayrahan Yılmaz
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import torch
+import gc
 import matplotlib.pyplot as plt
-from transformers import GPT2LMHeadModel, GPT2Config
-from hfp import HFPForCausalLM, HFPConfig
-import os
+import numpy as np
+import multiprocessing as mp
 
-def calculate_tensor_memory_mb(tensors):
-    """Recursively calculates the memory size of tensors in Megabytes."""
-    total_bytes = 0
-    if isinstance(tensors, torch.Tensor):
-        total_bytes += tensors.nelement() * tensors.element_size()
-    elif isinstance(tensors, (tuple, list)):
-        for t in tensors:
-            # We don't divide here because we might recurse.
-            # Convert back to bytes for summing if the recursive call divided by 1024/1024,
-            # actually let's just return bytes and divide at the very end.
-            pass # See refactored version below
-    return total_bytes / (1024 * 1024)
-
-def get_bytes(tensors):
-    total = 0
-    if isinstance(tensors, torch.Tensor):
-        total += tensors.nelement() * tensors.element_size()
-    elif isinstance(tensors, (tuple, list)):
-        for t in tensors:
-            total += get_bytes(t)
-    elif hasattr(tensors, 'get_state'):
-        state_dict = tensors.get_state()
-        for k, v in state_dict.items():
-            if isinstance(v, torch.Tensor):
-                total += v.nelement() * v.element_size()
-    return total
-
-def calculate_memory_mb(tensors):
-    return get_bytes(tensors) / (1024 * 1024)
-
-def run_memory_benchmark():
-    print("--- Starting O(1) Memory vs O(N) KV-Cache Benchmark ---")
-    
-    # Target configurations (124M Parameters - GPT2 Small Equivalent)
-    seq_lengths = [1, 256, 512, 1024, 2048, 4096, 8192]
-    
-    # 1. Initialize Standard Transformer (GPT-2)
-    gpt2_config = GPT2Config(
-        vocab_size=50257, n_positions=8192, n_embd=768, 
-        n_layer=12, n_head=12
-    )
-    gpt2_model = GPT2LMHeadModel(gpt2_config).eval()
-    gpt2_base_mb = calculate_memory_mb(list(gpt2_model.parameters()))
-    
-    # 2. Initialize HFP V2.1
-    hfp_config = HFPConfig(
-        vocab_size=50257, hidden_size=768, num_hidden_layers=12, 
-        num_attention_heads=12, max_position_embeddings=8192
-    )
-    hfp_model = HFPForCausalLM(hfp_config).eval()
-    hfp_base_mb = calculate_memory_mb(list(hfp_model.parameters()))
-
-    print(f"GPT-2 Base Model Size: {gpt2_base_mb:.2f} MB")
-    print(f"HFP V2.1 Base Model Size: {hfp_base_mb:.2f} MB")
-    
-    gpt2_memory_history = []
-    hfp_memory_history = []
-
-    # Run Simulation
-    with torch.no_grad():
-        for length in seq_lengths:
-            print(f"Simulating Context Length: {length} tokens...")
-            # Create a dummy input sequence of exact length
-            dummy_input = torch.randint(0, 50000, (1, length))
+def memory_worker(model_type, length, batch_size, precision, queue):
+    try:
+        # Import inside worker to ensure fresh CUDA context
+        import torch
+        from transformers import GPT2LMHeadModel, GPT2Config
+        from hfp.models.configuration_hfp import HFPConfig
+        from hfp.models.modeling_hfp import HFPForCausalLM
+        
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        dtype = torch.float16 if precision == 'FP16' else torch.float32
+        
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+        
+        # Determine hidden size and layers for roughly equal parameter counts (~124M)
+        hidden_size = 768
+        num_layers = 12
+        num_heads = 12
+        vocab_size = 50257
+        
+        dummy_input = torch.randint(0, vocab_size, (batch_size, length), device=device)
+        
+        if model_type == 'GPT2':
+            config = GPT2Config(
+                vocab_size=vocab_size, n_embd=hidden_size, n_layer=num_layers,
+                n_head=num_heads, n_positions=32768
+            )
+            model = GPT2LMHeadModel(config).to(dtype).to(device).eval()
             
-            # GPT-2 Forward Pass (Generates KV Cache for 'length' tokens)
-            gpt2_outputs = gpt2_model(dummy_input, use_cache=True)
-            gpt2_kv_cache = gpt2_outputs.past_key_values
-            gpt2_cache_mb = calculate_memory_mb(gpt2_kv_cache)
-            
-            # Standard Transformer Attention Matrix scales as O(N^2)
-            # Size = batch_size * num_heads * seq_len * seq_len * 4 bytes
-            attention_matrix_mb = (1 * gpt2_config.n_head * length * length * 4) / (1024 * 1024)
-            gpt2_total_mb = gpt2_base_mb + gpt2_cache_mb + attention_matrix_mb
-            gpt2_memory_history.append(gpt2_total_mb)
-            
-            # HFP Forward Pass (Generates O(1) Bulk State)
-            if hasattr(hfp_model, 'bulk_state') and hasattr(hfp_model.bulk_state, 'reset_state'):
-                hfp_model.bulk_state.reset_state()
+            with torch.no_grad():
+                outputs = model(dummy_input, use_cache=True)
+                del outputs
+                
+        elif model_type == 'HFP':
+            config = HFPConfig(
+                vocab_size=vocab_size, hidden_size=hidden_size, num_hidden_layers=num_layers,
+                num_attention_heads=num_heads, max_position_embeddings=32768,
+                short_len=8, bulk_dim=32, intermediate_size=hidden_size * 4,
+                MIXED_PRECISION=(precision == 'FP16')
+            )
+            model = HFPForCausalLM(config).to(dtype).to(device).eval()
             
             chunk_size = 256
             hfp_state = None
-            for i in range(0, length, chunk_size):
-                chunk = dummy_input[:, i:i+chunk_size]
-                hfp_outputs = hfp_model(chunk, past_key_values=hfp_state, use_cache=True)
-                hfp_state = hfp_outputs.past_key_values
-                
-            hfp_state_mb = calculate_memory_mb(hfp_state)
-            hfp_total_mb = hfp_base_mb + hfp_state_mb
-            hfp_memory_history.append(hfp_total_mb)
+            
+            with torch.no_grad():
+                for i in range(0, length, chunk_size):
+                    chunk = dummy_input[:, i:i+chunk_size]
+                    outputs = model(chunk, past_key_values=hfp_state, use_cache=True)
+                    hfp_state = outputs.past_key_values
+                    del outputs
+                    
+        # Capture metrics
+        # Cross validate with memory stats dictionary
+        peak_bytes = torch.cuda.memory_stats()['allocated_bytes.all.peak']
+        peak_mb = peak_bytes / (1024 * 1024)
+        
+        # Clean up explicitly before returning
+        del model
+        del dummy_input
+        torch.cuda.empty_cache()
+        
+        queue.put(('SUCCESS', peak_mb))
+        
+    except RuntimeError as e:
+        if "out of memory" in str(e).lower():
+            queue.put(('OOM', 0.0))
+        else:
+            queue.put(('ERROR', str(e)))
+    except Exception as e:
+        queue.put(('ERROR', str(e)))
 
-    # Plotting
-    plt.style.use('ggplot')
-    plt.figure(figsize=(10, 6))
+def run_isolated(model_type, length, batch_size, precision):
+    ctx = mp.get_context('spawn')
+    q = ctx.Queue()
+    p = ctx.Process(target=memory_worker, args=(model_type, length, batch_size, precision, q))
+    p.start()
+    p.join(timeout=300) # 5 minutes max
     
-    plt.plot(seq_lengths, gpt2_memory_history, marker='o', color='#1f77b4', linewidth=2.5, label='Standard Transformer (GPT-2) - O(N²) Attention Peak VRAM')
-    plt.plot(seq_lengths, hfp_memory_history, marker='o', color='#d62728', linewidth=3.5, label='HFP V2.1 (Thermodynamic State) - Strictly O(1)')
-    
-    plt.fill_between(seq_lengths, gpt2_memory_history, hfp_memory_history, color='gray', alpha=0.1)
-    
-    plt.title("VRAM Consumption Scaling: Standard Transformer vs. HFP V2.1\n(124M Parameters | Inference Mode)")
-    plt.xlabel("Sequence Length (Tokens)")
-    plt.ylabel("Total VRAM Footprint (MB)")
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.legend(loc='upper left')
-    
-    # Annotate the O(1) stability
-    plt.annotate('Constant O(1) Memory\nRegardless of Context', 
-                 xy=(4096, hfp_memory_history[-2]), 
-                 xytext=(4096, hfp_memory_history[-2] - 150),
-                 arrowprops=dict(facecolor='black', shrink=0.05),
-                 horizontalalignment='center')
+    if p.is_alive():
+        p.terminate()
+        p.join()
+        return 'TIMEOUT', 0.0
+        
+    if not q.empty():
+        return q.get()
+    else:
+        return 'CRASH', 0.0
 
-    plot_path = "benchmark_results_gpu.png"
+def plot_memory_results(results_dict, lengths, num_runs, batch_sizes):
+    plt.style.use('dark_background')
+    fig, axes = plt.subplots(1, len(batch_sizes), figsize=(6 * len(batch_sizes), 6))
+    if len(batch_sizes) == 1:
+        axes = [axes]
+        
+    for ax, bs in zip(axes, batch_sizes):
+        ax.set_title(f"Memory Scaling (Batch Size={bs}, FP16)\n{num_runs}-Run Variance", fontsize=12)
+        ax.set_xlabel("Context Length (Tokens)")
+        ax.set_ylabel("Peak VRAM Allocated (MB)")
+        ax.grid(True, alpha=0.2)
+        
+        for model in ['GPT2', 'HFP']:
+            means = []
+            stds = []
+            valid_lengths = []
+            
+            for l in lengths:
+                vals = results_dict[bs][model][l]
+                valid_vals = [v for v in vals if v is not None]
+                if len(valid_vals) > 0:
+                    means.append(np.mean(valid_vals))
+                    stds.append(np.std(valid_vals))
+                    valid_lengths.append(l)
+                else:
+                    # OOM reached
+                    if len(valid_lengths) > 0:
+                        last_x = valid_lengths[-1]
+                        last_y = means[-1]
+                        ax.annotate('OOM', xy=(last_x, last_y), xytext=(last_x, last_y + 1000),
+                                    arrowprops=dict(facecolor='red', shrink=0.05), color='red',
+                                    fontsize=10, ha='center')
+                    break
+                    
+            if len(valid_lengths) > 0:
+                color = '#ff4757' if model == 'GPT2' else '#2ed573'
+                ax.errorbar(valid_lengths, means, yerr=stds, label=f"{model}",
+                            color=color, marker='o', linewidth=2, capsize=5)
+                            
+        ax.legend()
+        
     plt.tight_layout()
-    plt.savefig(plot_path, dpi=150)
-    print(f"\nPlot successfully saved to {plot_path}")
-    print("Benchmark complete! Mathematical O(1) scaling proved.")
+    plt.savefig('benchmark_results_gpu_comprehensive.png', dpi=300, bbox_inches='tight')
+    print("Saved comprehensive plot to benchmark_results_gpu_comprehensive.png")
 
-if __name__ == "__main__":
-    run_memory_benchmark()
+if __name__ == '__main__':
+    # Modified length sequence as requested: up to 16K
+    lengths = [1, 256, 512, 1024, 2048, 4096, 8192, 16384]
+    batch_sizes = [1, 4, 8]
+    precision = 'FP16'
+    num_runs = 5
+    
+    results = {bs: {'GPT2': {l: [] for l in lengths}, 'HFP': {l: [] for l in lengths}} for bs in batch_sizes}
+    
+    for bs in batch_sizes:
+        print(f"\n--- Testing Batch Size: {bs} ---")
+        for length in lengths:
+            for model in ['GPT2', 'HFP']:
+                # Skip if already OOM'd in previous length step
+                idx = lengths.index(length)
+                if idx > 0:
+                    prev_l = lengths[idx-1]
+                    prev_vals = results[bs][model][prev_l]
+                    if len([v for v in prev_vals if v is not None]) == 0:
+                        results[bs][model][length] = [None]
+                        continue
+                    
+                run_vals = []
+                print(f"Profiling {model} (L={length}, B={bs})...", end='', flush=True)
+                for r in range(num_runs):
+                    status, peak_mb = run_isolated(model, length, bs, precision)
+                    if status == 'SUCCESS':
+                        run_vals.append(peak_mb)
+                    elif status == 'OOM':
+                        print(f" [Run {r+1}: OOM]", end='')
+                    else:
+                        print(f" [Run {r+1}: {status}]", end='')
+                
+                if len(run_vals) > 0:
+                    results[bs][model][length] = run_vals
+                    print(f" Avg Peak: {np.mean(run_vals):.1f} MB (±{np.std(run_vals):.1f})")
+                else:
+                    print(" Failed/OOM")
+                    results[bs][model][length] = [None]
+                    
+    plot_memory_results(results, lengths, num_runs, batch_sizes)
