@@ -48,5 +48,23 @@ for s in 1 2; do
   done
 done
 
+# --- 5) FAZ 1B: cubic_flux ADIL testi (2x2 retention x feature-map, uzun-ufuk) ---
+# Ana izgara: lr 1e-3, 3 seed x {exp,cubic} x {elu,dpfp}
+for s in 0 1 2; do
+  for ret in exp cubic_flux_chunked; do
+    for fm in elu dpfp; do
+      run_until_done "clh $ret/$fm lr1e-3 s$s" $PY review_scripts/cubic_longhorizon.py $ret $fm 1e-3 $s $BUDGET
+    done
+  done
+done
+# cubic LR-dayanikliligi (duyarli mod), seed 0, iki fmap, iki ek LR (INCELEME uyarisi)
+for lr in 3e-4 3e-3; do
+  for fm in elu dpfp; do
+    run_until_done "clh cubic/$fm lr$lr s0" $PY review_scripts/cubic_longhorizon.py cubic_flux_chunked $fm $lr 0 $BUDGET
+  done
+done
+
 echo "=== TUM ACIK HUCRELER TAMAM. Sonuclar: $HFP_CKPT_DIR/*.txt ==="
+echo "Faz 1b karar: cubic_lh_results.txt -> cubic_flux_chunked+dpfp, 256+ kovasinda"
+echo "  exp+dpfp'yi 3 seed'de >2 SE geciyor mu? (onceden yazilan basari kriteri)"
 echo "Sonrasi: DENEY_SONUCLARI.md + RESULTS.md + osf_companion.tex'i bu sayilarla guncelleyin."
