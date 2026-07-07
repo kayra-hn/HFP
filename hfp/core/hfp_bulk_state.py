@@ -335,7 +335,7 @@ class HFPBulkState(nn.Module):
                 z = z * lam_m.view(1, -1) + K_rev.sum(dim=1)
             retrieved = torch.cat(outputs, dim=1)                             # (B,L,H)
 
-        elif self.write_rule == "delta":
+        elif self.write_rule == "delta" and self.decay_mode != "cubic_flux_chunked":
             # [HFP-DELTA] Sirali delta-yazim; decay_mode lam'i belirler (exp/cubic).
             beta = torch.sigmoid(self.beta_gate(x)).to(dtype)                # (B,L,1)
             if self.decay_mode == "exp":
