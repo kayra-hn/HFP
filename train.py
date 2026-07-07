@@ -127,7 +127,8 @@ def main():
             decay_mode="cubic_flux_chunked",
             key_feature_map="dpfp",
             write_rule="delta",
-            ffn_type="standard"
+            ffn_type="standard",
+            rec_block=16
         )
         model = HFPForCausalLM(config)
         if args.optimizer == 'thermodynamic':
