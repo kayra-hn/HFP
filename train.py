@@ -80,7 +80,17 @@ def main():
     # 'thermodynamic' = fizik-ilhamlı opsiyonel knob (lineer relaksasyon damping).
     parser.add_argument("--optimizer", type=str, choices=['adamw', 'thermodynamic'], default='adamw')
     parser.add_argument("--warmup_steps", type=int, default=100)
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    parser.add_argument("--log_tag", type=str, default=None, help="Custom tag for log file naming")
     args = parser.parse_args()
+
+    # Seed ayarla (reproducibility)
+    import random
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -148,7 +158,7 @@ def main():
     best_val_loss = float('inf')
     patience_counter = 0
     
-    log_file = f"{args.model}_log.csv"
+    log_file = f"{args.log_tag}_log.csv" if args.log_tag else f"{args.model}_log.csv"
     with open(log_file, mode='w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['step', 'train_loss', 'val_loss', 'val_perplexity'])
