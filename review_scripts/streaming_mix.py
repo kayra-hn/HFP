@@ -26,8 +26,9 @@ from hfp.models.configuration_hfp import HFPConfig
 from hfp.models.modeling_hfp import HFPForCausalLM
 
 WRITE, FMAP, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3])
-BUDGET = float(sys.argv[4]) if len(sys.argv) > 4 else 33.0
-TAG = f"sm_{WRITE}_{FMAP}_{SEED}"
+DECAY = sys.argv[4] if len(sys.argv) > 4 else "exp"
+BUDGET = float(sys.argv[5]) if len(sys.argv) > 5 else 33.0
+TAG = f"sm_{DECAY}_{WRITE}_{FMAP}_{SEED}"
 CKPT = f"{CKDIR}/{TAG}.pt"
 STEPS = 600
 KLO, KHI, VLO, VHI, FHI = 100, 130, 130, 160, 100
@@ -69,7 +70,7 @@ random.seed(SEED); np.random.seed(SEED); torch.manual_seed(SEED)
 cfg = HFPConfig(vocab_size=VHI + 4, hidden_size=64, num_hidden_layers=2,
                 num_attention_heads=2, intermediate_size=256, bulk_dim=32,
                 short_len=8, max_position_embeddings=1288, local_window=WIN,
-                decay_mode="exp", rec_block=32, write_rule=WRITE, key_feature_map=FMAP)
+                decay_mode=DECAY, rec_block=32, write_rule=WRITE, key_feature_map=FMAP)
 model = HFPForCausalLM(cfg)
 opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
 sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=STEPS)

@@ -18,10 +18,29 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import logging
+from typing import List
 
 logging.basicConfig(level=logging.WARNING, format='[%(levelname)s] %(message)s')
 from .hfp_utils import LandmarkBuffer, compute_gate_entropy, coherence_score
 from .hfp_config import config as hfp_config
+
+
+@torch.jit.script
+def _cubic_zscan(K: torch.Tensor, eta: torch.Tensor, z0: torch.Tensor) -> torch.Tensor:
+    """[HFP-SCALE HIZ] cubic_flux z-taramasi, TorchScript-derlenmis (birebir eager ile ayni).
+        lam_t = 1/sqrt(1 + 2*eta*z_{t-1}^2) ;  z_t = lam_t*z_{t-1} + k_t
+    Dogrusal-OLMAYAN recurrence (lam z'ye bagli) -> associative/paralel-scan MUMKUN DEGIL;
+    ama loop'u fuze edip Python-yorumlayici overhead'ini kaldirir (uzun L'de ~2-4x hiz,
+    matematik degismez). K:(B,L,D) eta:(1,D) z0:(B,D) -> lam_seq:(B,L,D)."""
+    z = z0
+    lam_list: List[torch.Tensor] = []
+    L = int(K.shape[1])
+    for t in range(L):
+        lam = 1.0 / torch.sqrt(1.0 + 2.0 * eta * z * z)
+        lam_list.append(lam)
+        z = z * lam + K[:, t]
+    return torch.stack(lam_list, dim=1)
+
 
 class HFPBulkState(nn.Module):
     """
@@ -372,13 +391,18 @@ class HFPBulkState(nn.Module):
             # (bkz. review_scripts/scaling_checks.py); rec_block yalnizca hiz/bellek
             # dengesidir. Bellek: intra-blok tensoru (B,m,m,key_dim).
             eta = torch.exp(self.log_eta).to(dtype).unsqueeze(0)                 # (1,D)
-            lam_list = []
-            z_run = z
-            for t in range(seq_len):                                            # GECIS 1 (ucuz)
-                lam_t = 1.0 / torch.sqrt(1.0 + 2.0 * eta * z_run * z_run)        # (B,D)
-                lam_list.append(lam_t)
-                z_run = z_run * lam_t + K[:, t]
-            lam_seq = torch.stack(lam_list, dim=1)                               # (B,L,D)
+            
+            if self.write_rule == "delta":
+                beta_all = torch.sigmoid(self.beta_gate(x)).to(dtype)             # (B,L,1)
+                Kn_all = K / (K.norm(dim=-1, keepdim=True) + 1e-6)                # ||k||=1
+                K_scan = Kn_all
+            else:
+                K_scan = K
+                
+            # [HFP-SCALE HIZ] GECIS 1 (z-taramasi) TorchScript-derlenmis _cubic_zscan ile;
+            # birebir ayni lam_seq, ama Python-loop overhead'i kalkar (uzun L'de ~2-4x).
+            # Sirali dogasi korunur (dogrusal-olmayan recurrence -> paralel-scan yok).
+            lam_seq = _cubic_zscan(K_scan, eta, z)                                    # (B,L,D)
             loglam = torch.log(lam_seq.clamp_min(1e-12))
 
             for s0 in range(0, seq_len, self.rec_block):                         # GECIS 2
@@ -389,30 +413,61 @@ class HFPBulkState(nn.Module):
                 cs = torch.cumsum(loglam[:, s0:s0 + m], dim=1)                   # (B,m,D): log A_i, A_i = prod_{j<=i} lam_j
                 A = torch.exp(cs)                                                # (B,m,D) <= 1
 
-                # cross-block: M_0/z_0 katkisi A_i ile soner
-                Q_dec = Qb * A                                                   # (B,m,D)
-                num_cross = torch.bmm(Q_dec, M)                                  # (B,m,H)
-                den_cross = (Q_dec * z.unsqueeze(1)).sum(-1)                     # (B,m)
-
-                # intra-blok: pair (i,j<=i) katsayisi prod_{s=j+1..i} lam_s = exp(cs_i - cs_j) <= 1
                 ii = torch.arange(m, device=device).view(m, 1)
                 jj = torch.arange(m, device=device).view(1, m)
                 causal = (ii >= jj).to(dtype)                                    # (m,m)
                 Dm = torch.exp(cs.unsqueeze(2) - cs.unsqueeze(1))                # (B,m,m,D): exp(cs_i - cs_j)
-                Dm = Dm * causal.view(1, m, m, 1)
-
-                S = torch.einsum('bih,bijh,bjh->bij', Qb, Dm, Kb)                # (B,m,m)
-                num_intra = torch.bmm(S, Vb)                                     # (B,m,H)
-                den_intra = S.sum(dim=2)                                         # (B,m)
-
-                den = (den_cross + den_intra + 1e-6).unsqueeze(-1)
-                outputs.append((num_cross + num_intra) / den)
-
-                # state guncelle (blok sonu): A_m = tum blok carpimi
-                A_m = A[:, -1]                                                   # (B,D)
-                K_dec = Kb * torch.exp(cs[:, -1:] - cs)                          # (B,m,D): prod_{s=j+1..m}
-                M = M * A_m.unsqueeze(-1) + torch.bmm(K_dec.transpose(1, 2), Vb)
-                z = z * A_m + K_dec.sum(dim=1)
+                
+                if self.write_rule == "delta":
+                    Knb = Kn_all[:, s0:s0 + m]
+                    bb = beta_all[:, s0:s0 + m]
+                    
+                    # cross-block A_t
+                    K_dec = Knb * A
+                    A_cross = torch.bmm(K_dec, M)
+                    
+                    # intra-block S_tj (strict)
+                    strict = (ii > jj).to(dtype)
+                    Dm_strict = Dm * strict.view(1, m, m, 1)
+                    S = torch.einsum('bih,bijh,bjh->bij', Knb, Dm_strict, Knb)
+                    
+                    # unit alt-ucgen cozum
+                    T = torch.eye(m, device=device, dtype=dtype).unsqueeze(0) + bb * S
+                    W = torch.linalg.solve_triangular(T, bb * (Vb - A_cross), upper=False)
+                    
+                    # ciktilar
+                    Q_dec = Qb * A
+                    out_cross = torch.bmm(Q_dec, M)
+                    Dm_causal = Dm * causal.view(1, m, m, 1)
+                    Sq = torch.einsum('bih,bijh,bjh->bij', Qb, Dm_causal, Knb)
+                    outputs.append(out_cross + torch.bmm(Sq, W))
+                    
+                    # durum guncelle (blok sonu)
+                    A_m = A[:, -1]
+                    K_rev = Knb * torch.exp(cs[:, -1:] - cs)
+                    M = M * A_m.unsqueeze(-1) + torch.bmm(K_rev.transpose(1, 2), W)
+                    z = z * A_m + K_rev.sum(dim=1)
+                else:
+                    # cross-block: M_0/z_0 katkisi A_i ile soner
+                    Q_dec = Qb * A                                                   # (B,m,D)
+                    num_cross = torch.bmm(Q_dec, M)                                  # (B,m,H)
+                    den_cross = (Q_dec * z.unsqueeze(1)).sum(-1)                     # (B,m)
+    
+                    # intra-blok: pair (i,j<=i) katsayisi prod_{s=j+1..i} lam_s = exp(cs_i - cs_j) <= 1
+                    Dm_causal = Dm * causal.view(1, m, m, 1)
+    
+                    S = torch.einsum('bih,bijh,bjh->bij', Qb, Dm_causal, Kb)         # (B,m,m)
+                    num_intra = torch.bmm(S, Vb)                                     # (B,m,H)
+                    den_intra = S.sum(dim=2)                                         # (B,m)
+    
+                    den = (den_cross + den_intra + 1e-6).unsqueeze(-1)
+                    outputs.append((num_cross + num_intra) / den)
+    
+                    # state guncelle (blok sonu): A_m = tum blok carpimi
+                    A_m = A[:, -1]                                                   # (B,D)
+                    K_dec = Kb * torch.exp(cs[:, -1:] - cs)                          # (B,m,D): prod_{s=j+1..m}
+                    M = M * A_m.unsqueeze(-1) + torch.bmm(K_dec.transpose(1, 2), Vb)
+                    z = z * A_m + K_dec.sum(dim=1)
             retrieved = torch.cat(outputs, dim=1)                              # (B,L,H)
 
         else:

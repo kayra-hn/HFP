@@ -23,10 +23,10 @@ from hfp.core.hfp_bulk_state import HFPBulkState
 torch.manual_seed(0)
 H, B = 32, 4
 
-def make(mode, rec_block, seed=1):
+def make(mode, rec_block, seed=1, write_rule="additive"):
     torch.manual_seed(seed)
     m = HFPBulkState(hidden_size=H, short_len=4, max_short_len=8,
-                     rec_block=rec_block, decay_mode=mode)
+                     rec_block=rec_block, decay_mode=mode, write_rule=write_rule)
     m.eval()
     return m
 
@@ -38,6 +38,15 @@ with torch.no_grad():
 d = (r_exact - r_b1).abs().max().item()
 dM = (st_e[1] - st_1[1]).abs().max().item()
 print(f"  max|out| = {d:.2e}   max|M| = {dM:.2e}   ->", "PASS" if d < 1e-5 else "FAIL")
+
+print("\n== 1.5) tamlik kontrolu DELTA (chunked == sirali cubic) ==")
+with torch.no_grad():
+    _, r_exact_d, st_ed = make("cubic_flux", 64, write_rule="delta").update(x)
+    _, r_b1_d, st_1d = make("cubic_flux_chunked", 16, write_rule="delta").update(x)
+dd = (r_exact_d - r_b1_d).abs().max().item()
+dMd = (st_ed[1] - st_1d[1]).abs().max().item()
+dzd = (st_ed[2] - st_1d[2]).abs().max().item()
+print(f"  max|out| = {dd:.2e}   max|M| = {dMd:.2e}  max|z| = {dzd:.2e} ->", "PASS" if dd < 1e-5 else "FAIL")
 
 print("\n== 2) Yaklasim hatasi (L=256, cikti bazinda goreli) ==")
 x = torch.randn(B, 256, H)

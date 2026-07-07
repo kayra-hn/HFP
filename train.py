@@ -24,6 +24,8 @@ from hfp.core.physics_optimizers import AdamW_Thermodynamic, StiffTransientSched
 import numpy as np
 import os
 import argparse
+import csv
+import math
 
 def get_batch(data, seq_length, batch_size, device):
     ix = torch.randint(len(data) - seq_length, (batch_size,))
@@ -90,7 +92,12 @@ def main():
 
     with open(data_path, 'r', encoding='utf-8') as f:
         text = f.read()
-    data = np.array(tokenizer.encode(text))
+    # Metni kucuk parcalar halinde tokenize ederek bellek sorunlarini/uyarilarini onle
+    chunk_size = 100000
+    data_list = []
+    for i in range(0, len(text), chunk_size):
+        data_list.extend(tokenizer.encode(text[i:i+chunk_size], truncation=False))
+    data = np.array(data_list, dtype=np.int64)
 
     n = int(0.9 * len(data))
     train_data = data[:n]
@@ -116,7 +123,11 @@ def main():
         config = HFPConfig(
             vocab_size=vocab_size, hidden_size=hidden_size, num_hidden_layers=num_layers,
             num_attention_heads=num_heads, max_position_embeddings=args.seq_length,
-            short_len=8, bulk_dim=32
+            short_len=8, bulk_dim=32,
+            decay_mode="cubic_flux_chunked",
+            key_feature_map="dpfp",
+            write_rule="delta",
+            ffn_type="standard"
         )
         model = HFPForCausalLM(config)
         if args.optimizer == 'thermodynamic':
@@ -135,13 +146,24 @@ def main():
 
     best_val_loss = float('inf')
     patience_counter = 0
+    
+    log_file = f"{args.model}_log.csv"
+    with open(log_file, mode='w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['step', 'train_loss', 'val_loss', 'val_perplexity'])
 
     for iter in range(args.max_iters):
         if iter % args.eval_interval == 0 or iter == args.max_iters - 1:
             losses = estimate_loss(model, train_data, val_data, 50, args.seq_length, args.batch_size, device)
-            print(f"\nStep {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+            val_ppl = math.exp(losses['val'])
+            print(f"\nStep {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}, val ppl {val_ppl:.2f}")
             sample = generate_sample(model, tokenizer, device, max_new_tokens=30)
             print(f"--- Sample Generation ---\n{sample}\n-------------------------")
+            
+            with open(log_file, mode='a', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow([iter, losses['train'], losses['val'], val_ppl])
+                
             if losses['val'] < best_val_loss:
                 best_val_loss = losses['val']
                 patience_counter = 0
