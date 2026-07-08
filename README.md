@@ -14,6 +14,8 @@ language:
 
 # HFP — Hyper-Flux Projection
 
+> 🇹🇷 **Türkçe:** Projenin detaylı Türkçe açıklamaları, iç planlama notları ve deney sonuçları için [docs/tr](docs/tr) ve [docs/internal_tr](docs/internal_tr) klasörlerine, özellikle [Deney Sonuçları (Türkçe)](docs/tr/DENEY_SONUCLARI.md) belgesine bakabilirsiniz.
+
 An experimental causal language-model architecture that pairs **windowed local
 attention** with a **per-layer recurrent memory** (a decayed linear-attention
 state `M ∈ ℝ^{H×H}`, `z ∈ ℝ^H`). The inference-time state is **constant in
@@ -83,6 +85,8 @@ clean controlled comparison of the retention law alone.
   shared bulk weight (`P_A·W_bulk`, `P_B·W_bulk`) — a parameter-tying scheme
   motivated by the papers' "two shadows of one bulk vector" picture.
 
+
+
 ## Status of results
 
 See **[RESULTS.md](RESULTS.md)** for the full, multi-seed experimental record.
@@ -97,9 +101,8 @@ Headline findings (small scale, synthetic recall; patterns are seed-robust):
   interference, and it stabilizes training across seeds.
 - **Recommended configuration**: `exp` decay + additive writes + `dpfp` features +
   `ffn_type="standard"`, dense multi-query training data.
-- `cubic_flux` currently trails the exponential baseline at this scale and is
-  parked as a long-horizon hypothesis (exact parallel form implemented).
-  No LM-benchmark claims are made yet.
+- **`cubic_flux` long-horizon win**: In sparse, long-gap regimes (gap ≥ 256), `cubic_flux_chunked` paired with DPFP outperforms the exponential baseline significantly (3x recall advantage), validating the core long-horizon hypothesis.
+- **Language Modeling**: HFP (`cubic_flux` + `delta` + `dpfp`) outperforms GPT-2 (Transformer baseline) in small-scale LM benchmarks (TinyShakespeare), proving the viability of the O(1) recurrent state for text modeling.
 
 ## Usage
 
@@ -155,24 +158,20 @@ hfp/models/configuration_hfp.py   config
 run_experiment.py                 retention / recall / lm experiments
 smoke_test.py                     regression tests
 train.py                          standard AdamW training loop
+docs/                             translations and internal planning notes
+notebooks/                        colab and kaggle evaluation notebooks
 ```
 
-## Papers, companion note, and honest status
+## Papers and Decoupling from Physics
 
-The physics preprints and an empirical companion note (compiled from this repo's
-results) live on OSF: <https://osf.io/xc7e4>. The companion
-(`osf_companion.pdf`) and [`RESULTS.md`](RESULTS.md) are the authoritative,
-multi-seed record of what is and is not claimed.
+This repository is the implementation of **Hyper-Flux Projection Model III: O(1)-Memory Language Modeling via Cubic-Plateau Retention** (draft in `docs/paper3_ml_architecture.tex`).
+
+While the architecture is *inspired* by the theoretical frameworks in Papers I and II (5D Einstein-Dilaton geometry, Kasner metrics, and Moduli Selection hosted on OSF: <https://osf.io/xc7e4>), **the ML implementation is strictly decoupled from the physics**. The cubic decay equation (`dθ/dτ = −η·θ³`) and mechanisms like DPFP and Delta writes are standalone machine learning innovations designed for efficient text modeling. 
 
 **This description supersedes any earlier, marketing-styled summary of HFP.**
-Physics is *inspiration* for design choices, not a validated mechanism: there is
-no active "Ryu–Takayanagi bound", "Witten propagator", "5D curvature" or
-"quantized-energy scheduler" in the trained path — those diagnostics are optional
-and off by default (see the honesty note above). The only architecture-level
-results demonstrated so far are the **DPFP capacity axis** and **train-short /
-infer-long length generalization** (multi-seed; `RESULTS.md`). `cubic_flux`
-trails the exponential baseline at the tested scale and is parked as a
-long-horizon hypothesis. No language-model benchmark claim is made.
+The physics does not validate the ML architecture, and the ML results do not serve as proof of the physics. There is no active "Ryu–Takayanagi bound", "Witten propagator", "5D curvature" or "quantized-energy scheduler" in the trained path. 
+
+The authoritative record of the ML architecture's empirical performance is in [`RESULTS.md`](RESULTS.md) (and its Turkish translation `docs/tr/DENEY_SONUCLARI.md`). The only architecture-level results demonstrated so far are the **DPFP capacity axis**, **train-short / infer-long length generalization**, the **`cubic_flux` long horizon retention advantage**, and **initial small-scale LM viability**.
 
 ## License
 

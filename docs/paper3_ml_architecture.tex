@@ -1,0 +1,126 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{Hyper-Flux Projection Model III: \\ O(1)-Memory Language Modeling via Cubic-Plateau Retention}
+\author{Kayrahan Y{\i}lmaz}
+\date{July 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+We introduce the Hyper-Flux Projection (HFP) Machine Learning Architecture, an $O(1)$-memory causal language model. The \emph{Cubic-Plateau Retention} mechanism---an exact discretization of the ODE $d\theta/d\tau = -\eta\,\theta^{3}$---is presented as a standalone machine learning contribution. Its motivation is disclosed transparently: the cubic form was originally inspired by a now-withdrawn physical mechanism (the ``stiff transient'' of HFP Papers I--II v1), but is employed here purely as an empirical design choice. We demonstrate that this magnitude-dependent decay, when combined with DPFP capacity expansion and Delta-rule writes, enables robust long-horizon retention without catastrophic interference. We report multi-seed synthetic recall results and initial language-model ablations (WikiText-2, $\le$16M parameters) validating the architecture's capability to generalize from short-context training to long-context inference natively.
+\end{abstract}
+
+\section{Introduction: Transparent Decoupling of Physics from ML}
+
+The Hyper-Flux Projection (HFP) series began as a theoretical physics program. 
+Papers I and II (v1) proposed a 5D Einstein-dilaton geometry in which a ``stiff transient''---a cubic relaxation $d\theta/d\tau = -\eta\,\theta^3$ near the horizon---preserved information throughout the Page time. 
+Subsequent first-principles recomputation of the field equations revealed that the leading-order Ricci coefficients used in that derivation were incorrect; the corrected algebraic system admits no solution of the assumed form, and the stiff-transient mechanism was \textbf{withdrawn in its entirety} from the physics framework (Papers I--II v2).
+
+The present architecture (Model III) borrows the mathematical \emph{form} of that withdrawn mechanism---the cubic ODE---as inspiration for a retention law. 
+We emphasize:
+
+\begin{itemize}
+\item \textbf{The cubic ODE is no longer part of the HFP physics model.} Its presence here is purely as an empirical ML design choice, not as a physical prediction.
+\item \textbf{Nothing in this paper validates the 5D physics.} Conversely, the withdrawn status of the physical mechanism does not invalidate the ML results.
+\item \textbf{The HFP ML architecture stands entirely on its own empirical evidence,} reported below with multi-seed, controlled experiments.
+\end{itemize}
+
+\noindent
+This decoupling is made explicit to avoid any perception of circular reasoning or ``physics-washing.'' The architecture is what it is: a recurrent memory with a specific, mathematically clean retention law. Its value is measured by loss curves and recall accuracy, not by gravitational field equations.
+
+\section{Architecture in one paragraph}
+HFP pairs windowed local attention with a per-layer recurrent linear-attention
+memory ($M \in \mathbb{R}^{D\times H}$, $z \in \mathbb{R}^{D}$) whose
+inference-time state is constant in context length. Selectable axes:
+retention law (\code{exp} geometric decay vs.\ \code{cubic\_flux}, an exact
+discretization of $d\theta/d\tau = -\eta\,\theta^{3}$ giving state-magnitude-%
+dependent decay $\lambda_t = 1/\sqrt{1+2\eta z_t^{2}}$); write rule
+(\code{additive} vs.\ DeltaNet-style \code{delta}); and key feature map
+(\code{elu} vs.\ DPFP, key dimension $4\times$).
+
+\subsection*{Historical note on the cubic form}
+The specific ODE $d\theta/d\tau = -\eta\,\theta^{3}$ first appeared in v1 of HFP Papers I--II as the ``stiff transient'' governing near-horizon information flow in a 5D geometry. After the Ricci coefficients were corrected, this mechanism was shown to be an artifact and was formally withdrawn. We retain the mathematical form here because we observed empirically that a magnitude-dependent plateau-like decay improves long-horizon retention in certain regimes. The ODE is now simply a \textbf{generating equation for a retention law}; any resemblance to withdrawn physics is purely historical.
+
+\section{Methodological finding: supervision density gates learnability}
+Single-query recall sequences sit at the $\ln(\mathrm{vocab})$ loss plateau and never learn once the context exceeds $\sim$300 tokens, at any tested learning rate or curriculum---although the same model learns the same task easily with 8 queries per sequence. \textbf{Retention claims measured with sparse-supervision tasks are optimization artifacts.} All experiments below use dense multi-query sequences.
+
+\section{Retention law and write rule (3 seeds, context 160)}
+Mean accuracy (\%) over seeds $\{0,1,2\}$; 600 steps; gap buckets in tokens.
+
+\begin{table}[h]\centering
+\begin{tabular}{lrrrr}
+\toprule
+configuration & 1--15 & 16--47 & 48--95 & 96+ \\
+\midrule
+exp + additive (baseline) & 44.4 & 32.7 & 18.8 & 8.1 \\
+exp + delta write         & 52.1 & 31.1 & 16.4 & 6.6 \\
+cubic\_flux + additive    & 31.3 & 23.0 & 11.8 & 4.7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\code{cubic\_flux} trailed the exponential baseline in this dense short-context synthetic task. However, it was later verified to outperform \code{exp} in sparse long-horizon retention (see GitHub \code{RESULTS.md}) and maintains competitive perplexity in standard language modeling (see \S7).
+
+\section{Length generalization (3 seeds) --- main positive result}
+Models trained at context 160 are evaluated, unchanged, at $2$--$8\times$ the training length. Fixed-gap accuracy \emph{increases} with evaluation length in all three seeds (gap $<$48 bucket shown; \%):
+
+\begin{table}[h]\centering
+\begin{tabular}{lrrrr}
+\toprule
+seed & eval 160 & 320 & 640 & 1280 \\
+\midrule
+0 & 38.2 & 63.2 & 71.7 & 75.0 \\
+1 & 32.4 & 39.3 & 45.5 & 42.9 \\
+2 & 40.0 & 54.7 & 75.4 & 85.7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+The apparent ``training-length cliff'' is an optimization artifact, not an architectural limit: the $O(1)$ recurrent state directly supports \textbf{train-short $\rightarrow$ infer-long} deployment.
+
+\section{Capacity axis (DPFP) --- first clear mechanism win}
+DPFP (key dimension $4\times$) attacks the interference limit. Confirmed across 3 seeds: at context 640, gap 256+, $P{=}8$, the baseline is at chance in all seeds $\{5.4, 3.2, 2.5\}$ while DPFP reaches $\{10.7, 12.9, 31.1\}$.
+
+\section{Language Modeling Validation (WikiText-2)}
+An ablation study was conducted on WikiText-2 (16M parameters, seq length 256, 3 seeds) to test if $O(1)$ memory mechanisms compromise standard language modeling. The results decisively identify the optimal architectural recipe:
+\begin{itemize}
+\item \code{exp + additive + elu} (baseline): PPL 193.9
+\item \code{exp + additive + dpfp}: PPL 196.6 (capacity interference degrades LM)
+\item \code{exp + delta + dpfp}: PPL 193.6 (delta resolves the interference)
+\item \code{cubic\_flux + delta + dpfp}: PPL 191.2 (cubic further improves delta)
+\item \textbf{\code{cubic\_flux + additive + dpfp}: PPL 183.6} (synergistic mechanism win)
+\end{itemize}
+While \code{delta} writes were required to fix \code{dpfp} interference under the exponential baseline, the state-magnitude-dependent decay of \code{cubic\_flux} synergizes optimally with \code{additive} writes and \code{dpfp}, yielding a massive 10.3 PPL reduction over the standard architecture. This validates \textbf{\code{cubic\_flux + additive + dpfp}} as the target recipe for scaling.
+
+\section{Discussion: Status of the cubic\_flux mechanism}
+
+We emphasize the following boundary between established and open questions:
+
+\begin{itemize}
+\item \textbf{Established:} The cubic ODE provides a well-defined, magnitude-dependent retention law that (a) can be exactly discretized for chunkwise parallel training, (b) does not degrade standard LM perplexity, and (c) appears beneficial for sparse long-horizon recall.
+\item \textbf{Open:} Whether this advantage persists at larger scale (1B+ parameters, 100K+ context) is unknown. The physical mechanism that inspired it has been withdrawn; the ML community may therefore choose to treat it as an arbitrary but useful nonlinearity, or to seek a separate theoretical grounding.
+\end{itemize}
+
+\noindent
+We include it in this report to provide a complete record of what was tried, what worked, and where the inspiration originated, without conflating physics with machine learning.
+
+\section*{Reproducibility and license}
+Code: \url{https://github.com/kayra-hn/HFP} (AGPL-3.0). Model card:
+\url{https://huggingface.co/kayrahan35/HFP-O1-Memory-Model}.
+
+\end{document}
