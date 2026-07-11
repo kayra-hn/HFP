@@ -172,6 +172,12 @@ class HFPGraftAttention(nn.Module):
         # Distilasyon durumu
         self.mode = "student"                # "student" | "teacher_forcing" | "teacher"
         self.last_distill_loss: Optional[torch.Tensor] = None
+        # [VRAM] Stage 1 katman-aninda backward: teacher_forcing'de her katmanin
+        # ogrenci grafigi BAGIMSIZDIR; float verilirse (orn. 1/ACCUM) MSE katman
+        # icinde hemen backward'lanir ve grafik serbest kalir -> tepe bellek
+        # 13 katman yerine 1 katmanlik graf. last_distill_loss detached kalir
+        # (yalnizca loglama icin); disaridan aux.backward() CAGRILMAZ.
+        self.distill_backward_scale: Optional[float] = None
         # Streaming durumu (needle/uzun-akis eval): (M, z, cq_state, ck_state)
         self.streaming = False
         self._stream_state = None
@@ -354,7 +360,13 @@ class HFPGraftAttention(nn.Module):
             s_out = self._student_forward(hidden_states)
             if self.mode == "teacher_forcing":
                 # Stage 1: katman-ici MSE hedefi; ileri OGRETMEN ciktisi gider
-                self.last_distill_loss = F.mse_loss(s_out, t_out)
+                l = F.mse_loss(s_out, t_out)
+                if (self.distill_backward_scale is not None and self.training
+                        and torch.is_grad_enabled()):
+                    (l * self.distill_backward_scale).backward()   # grafigi hemen bosalt
+                    self.last_distill_loss = l.detach()
+                else:
+                    self.last_distill_loss = l
                 out = t_out
             else:
                 out = s_out
@@ -411,6 +423,13 @@ def graft_llama(model, cfg: Optional[GraftConfig] = None,
     return grafted
 
 
+def set_distill_backward(model, scale: Optional[float]):
+    """Stage 1 VRAM modu: scale=1/ACCUM -> katman-aninda backward. None -> kapat."""
+    for m in model.modules():
+        if isinstance(m, HFPGraftAttention):
+            m.distill_backward_scale = scale
+
+
 def set_graft_mode(model, mode: str):
     assert mode in ("student", "teacher_forcing", "teacher")
     for m in model.modules():
@@ -443,3 +462,6 @@ def reset_streaming(model):
     for m in model.modules():
         if isinstance(m, HFPGraftAttention):
             m._stream_state = None
+
+
+# (dosya sonu)
