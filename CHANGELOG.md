@@ -29,15 +29,23 @@
   paths; token whitespace handling. New planning doc:
   `docs/internal_tr/SONRAKI_ADIMLAR_PLANI.md` (decision gates K1-K3, scenario
   tree, scaling + release pipeline).
+- Repo cleanup (~1.6 GB local artifacts + 9 tracked files): `_archive_old/`
+  v1 weights, local `model.safetensors` copy (hosted on HF), `__pycache__`
+  dirs, empty logs (`test_out.txt`, `hfp_log.csv`), stale root `sweep_ckpt.py`
+  duplicate, `debug_memory.py`, one-shot utilities (`add_license_headers.py`,
+  `cleanup_old_version.sh`), and three superseded notebooks (replaced by
+  `colab_gla_benchmark_v3.ipynb` and `colab_graft_qwen_v2.ipynb`).
 
 ## v2.1 — curated results release (2026-07)
 
 - **RESULTS.md**: full multi-seed experimental record (supervision-density
   methodology, length generalization to 8x training length, interference
   analysis, DPFP capacity-axis win, honest negative-results ledger).
-- Repo cleanup: v1-era diagnostic scripts (`debug_memory.py`, `eval_*.py`),
-  Turkish-language internal review documents and superseded runners removed;
-  experiment scripts use portable checkpoint paths (`HFP_CKPT_DIR`).
+- Repo cleanup: Turkish-language internal review documents and superseded
+  runners removed; experiment scripts use portable checkpoint paths
+  (`HFP_CKPT_DIR`). The `eval_*.py` diagnostics were kept (still referenced
+  by `NASIL_CALISTIRILIR.md` — notably `eval_memory_scaling.py`, which backs
+  the O(1)-VRAM claim); `debug_memory.py` was removed later in v2.2.
 - New experiment scripts: `length_gen.py`, `interference_eval.py`.
 
 
