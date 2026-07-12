@@ -7,6 +7,24 @@
 
 ---
 
+## 0a. Durum güncellemesi (2026-07-12, akşam)
+
+- **Grafting:** `graft_smoke.py` Colab T4'te 6/6 GEÇTİ. Qwen2.5-1.5B graft edildi
+  (13/28 katman, 324.805 eğitilebilir param). Teacher yolu birebir doğrulandı.
+  İlk turda bulunan üç sorun çözüldü: PPL çift-kaydırma metriği, Stage-1 OOM
+  (rec_block 16 + katman-anında backward), HF token boşluğu. Sıradaki: doğru
+  metrikle zero-shot sanity → Stage 1.
+- **GLA baseline:** naif implementasyon LM ölçeğinde diverge etti; üç aşamada
+  stabilize edildi (çıkış LayerNorm → pre-LN → 1/√H logit ölçeği). Sağlamlık
+  testi: loss 15.9→14.2 düzgün düşüş, patlama yok. `colab_gla_benchmark_v3.ipynb`
+  kendi kendine yeten sürüm (git zincirinden bağımsız, doğrudan yükleme).
+  Bu stabilizasyon zorunluluğu dürüst-not olarak CHANGELOG'a işlendi.
+- **v1 Görev B bulgusu RESULTS §11'e işlendi:** training-length cliff LM'de de
+  geçerli (3 seed, iki kol da ln|V| platosunda) → K2 deneyi train-short →
+  infer-long olarak yeniden tasarlandı.
+- **Kota notu:** ilk Kaggle oturumu yanlışlıkla CPU'da koştu (~15.5 saat, geçersiz).
+  GPU assert'leri eklendi; tekrarlanamaz.
+
 ## 0. Anlık durum
 
 **Koşuda / başlatılacak:**

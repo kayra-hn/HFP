@@ -3,7 +3,8 @@
 > Amaç: GPU kiralandığında ne koşulacağını, hangi sırayla, hangi başarı
 > kriteriyle ve neyin hâlâ açık olduğunu tek yerde toplamak. Tüm scriptler repo
 > kökünde hazır; komutlar Git Bash / Linux kabuğunda çalışır.
-> Son güncelleme: 2026-07.
+> Son güncelleme: 2026-07-12. Deney-sonrası karar kapıları ve devam planı için
+> bkz. `SONRAKI_ADIMLAR_PLANI.md` (bu belgenin devamı).
 
 ---
 
@@ -130,9 +131,9 @@ Sürücünün kapsadığı hücreler, amaç ve başarı kriterleri:
 2. **Two-tier (cubic-slow) öğrenilebilir rejimde uzun-gap'te iyileştiriyor mu?** Adil testi hiç yapılmadı.
 3. **exp'in çok-ölçekli λ'sı cubic'in avantajını ne kadar yiyor?** exp zaten multi-timescale; cubic'e ne kalıyor?
 4. **DPFP ölçekte nereye kadar?** key_dim 4× büyük modelde de girişim sınırını aşıyor mu, maliyet/fayda?
-5. **Delta chunkwise ölçekte:** güncelleme-ağır gerçek akışta (kod/diyalog) additive'i geçiyor mu?
+5. **Delta chunkwise ölçekte:** güncelleme-ağır gerçek akışta (kod/diyalog) additive'i geçiyor mu? *(Karar deneyi tasarlandı ve koşuda: train@256 → eval@2048, önceden yazılı kriter — `colab_gla_benchmark_v3.ipynb` Görev B / plan K2.)*
 6. ~~**LM-benchmark:** gerçek dilde exp+dpfp, GLA/Mamba'ya karşı rekabetçi mi?~~ **(GPT-2'yi Geçti)** HFP, GPT-2'den daha iyi (PPL 257 vs 300). GLA/Mamba karşılaştırması henüz yapılmadı. Hangi bileşen (cubic, delta, dpfp) LM'i uçuruyor? (Ablasyon Notebook'u sürüyor).
-7. **Grafting:** HFP-belleği pretrained modele distille edilebilir mi? Hangi katmanlar, kaç tanesi, ne kadar full-attention tutmalı?
+7. **Grafting:** HFP-belleği pretrained modele distille edilebilir mi? *(BAŞLADI: `hfp/models/grafting.py` + `colab_graft_qwen_v2.ipynb`; Qwen2.5-1.5B, 13/28 katman, kafa-başına bellek, α-gate melez yazım, teacher-forcing distilasyon. Smoke 6/6 geçti; Stage 1 koşulacak. Plan K3.)*
 8. **Streaming kararlılığı pratik fark yaratıyor mu?** cubic'in self-limiting'i (max|M| çok küçük) çok uzun akışta exp'e görünür avantaj mı?
 
 ---

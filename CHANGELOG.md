@@ -1,5 +1,35 @@
 # Changelog
 
+## v2.2 — grafting + external baseline infrastructure (2026-07-12)
+
+- **`hfp/models/grafting.py`** (Faz 3): HFP memory grafting onto pretrained
+  Llama-family LLMs. Per-head memory with GQA mapping (`repeat_interleave`),
+  DPFP per head; RoPE bypass; warm-start via shared frozen projections;
+  teacher-copy-free teacher-forcing distillation (fits one T4);
+  **alpha-gate hybrid write** — learnable per-head interpolation between
+  additive and delta (`M += β·k(v − α·v_old)ᵀ`), chunkwise-parallel via
+  triangular solve, verified against sequential reference in 8 configs
+  (exp/cubic × α∈{0,0.12,0.5,1}, max err ~3e-15). Layer-local immediate
+  backward option for Stage-1 VRAM (peak = 1 layer graph instead of 13).
+- **`review_scripts/graft_smoke.py`**: 6-test regression (gradient isolation,
+  teacher-forcing exactness, chunk/streaming consistency, zero-shot scale,
+  all mode combinations) — passes on Colab T4.
+- **Notebooks**: `colab_graft_qwen_v2.ipynb` (Stage 1 MSE + Stage 2 KL +
+  needle/VRAM validation; Qwen2.5-1.5B default), `colab_gla_benchmark_v3.ipynb`
+  (self-contained GLA baseline + pre-registered delta-vs-additive long-eval
+  decision experiment).
+- **GLA LM baseline stabilization** (honest note): a naive equal-parameter GLA
+  diverges at LM scale; it required output LayerNorm, pre-LN blocks and
+  1/√H logit scaling — indirect evidence for HFP's own normalization design
+  (retrieval LayerNorm + denominator + multi-scale decay init).
+- **RESULTS.md**: duplicate section numbering fixed; new §11 — the
+  training-length cliff also applies to LM (3-seed negative result at seq-1024
+  training); write-rule recipe note pending pre-registered K2 decision.
+- Metric-hygiene fixes found during review: HF label double-shift in eval/KL
+  paths; token whitespace handling. New planning doc:
+  `docs/internal_tr/SONRAKI_ADIMLAR_PLANI.md` (decision gates K1-K3, scenario
+  tree, scaling + release pipeline).
+
 ## v2.1 — curated results release (2026-07)
 
 - **RESULTS.md**: full multi-seed experimental record (supervision-density

@@ -96,6 +96,12 @@ HFP outperforms the full-attention baseline, confirming the O(1) recurrent archi
 `decay_mode="cubic_flux_chunked"`, `write_rule="delta"`, `key_feature_map="dpfp"`,
 `ffn_type="standard"`.
 
+> **Write-rule note.** The WikiText-2 ablation (§10) favors `additive` over
+> `delta` at seq 256 (PPL 183.6 vs 191.2, 3 seeds). The "delta wins at long
+> context" hypothesis is untested in LM. A pre-registered decision experiment
+> (train@256 → eval@2048; criterion: >2 SE) is running; the recipe will be
+> locked to its outcome. See `docs/internal_tr/SONRAKI_ADIMLAR_PLANI.md` (K2).
+
 ## 9. Parked / negative results (honest ledger)
 
 - Two-tier consolidation memory: prototype verified; could not be evaluated
@@ -114,7 +120,7 @@ LG_VARIANT=dpfp python review_scripts/length_gen.py train 0
 python review_scripts/interference_eval.py 0
 ```
 
-## 5. Language Modeling Validation (WikiText-2)
+## 10. Language Modeling Validation (WikiText-2)
 
 A definitive multi-seed (seeds 0, 1, 2) ablation was conducted on the WikiText-2 dataset (16M parameters, seq length 256) to validate the architectural components on dense language modeling. 
 
@@ -132,3 +138,13 @@ A definitive multi-seed (seeds 0, 1, 2) ablation was conducted on the WikiText-2
 
 **Conclusion:**
 The architecture combination of **`cubic_flux + additive + dpfp`** is strictly superior to all other variants, providing a 10.3 PPL reduction over the standard linear attention baseline. This is the established target recipe for future scaling.
+
+## 11. Training-length cliff applies to LM as well (3 seeds, negative result)
+
+Training directly at seq 1024 on WikiText-2 (16M params, lr 5e-4, 2500 iters,
+batch 8) leaves **both** `cubic+additive+dpfp` and `cubic+delta+dpfp` at the
+`ln|V|` plateau (val loss 10.85 ≈ ln 50257) in all 3 seeds — no learning at
+all, while the identical models train fine at seq 256. This extends the §3
+finding (retention tasks) to language modeling: **train-short → infer-long is
+required**; long-context comparisons must evaluate short-trained weights at
+long lengths rather than train at length.
