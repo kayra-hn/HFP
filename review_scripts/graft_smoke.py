@@ -34,7 +34,9 @@ Kontroller:
 Kosum: PYTHONPATH=. python review_scripts/graft_smoke.py
 """
 
-import sys, math
+import os, sys, math
+# repo kokunu sys.path'e ekle (PYTHONPATH gerektirmez; Colab/lokal her yerde calisir)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import torch.nn.functional as F
 
