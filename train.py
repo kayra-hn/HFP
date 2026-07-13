@@ -28,10 +28,13 @@ import csv
 import math
 
 def get_batch(data, seq_length, batch_size, device):
+    # [FIX M1 - CIFT KAYDIRMA] Hem HFPForCausalLM hem GPT2LMHeadModel labels'i
+    # ICERIDE kaydirir (HF konvansiyonu). Eskiden y=data[i+1:...] veriliyordu ->
+    # hedef fiilen x[t+2] oluyordu ("skip-one"); tum train.py PPL'leri bu hedefle
+    # olculmustu. Dogrusu labels=x: icerdeki kaydirma next-token'i kurar.
     ix = torch.randint(len(data) - seq_length, (batch_size,))
     x = torch.stack([torch.from_numpy((data[i:i+seq_length]).astype(np.int64)) for i in ix])
-    y = torch.stack([torch.from_numpy((data[i+1:i+1+seq_length]).astype(np.int64)) for i in ix])
-    return x.to(device), y.to(device)
+    return x.to(device), x.to(device)
 
 @torch.no_grad()
 def estimate_loss(model, train_data, val_data, eval_iters, seq_length, batch_size, device):
