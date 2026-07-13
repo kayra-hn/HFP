@@ -136,7 +136,7 @@ def main():
             short_len=8, bulk_dim=32,
             decay_mode="cubic_flux_chunked",
             key_feature_map="dpfp",
-            write_rule="delta",
+            write_rule="additive",   # K2 karariyla kilitlendi (RESULTS §13)
             ffn_type="standard",
             rec_block=16
         )

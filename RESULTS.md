@@ -93,14 +93,15 @@ HFP outperforms the full-attention baseline, confirming the O(1) recurrent archi
 
 ## 8. Current recipe
 
-`decay_mode="cubic_flux_chunked"`, `write_rule="delta"`, `key_feature_map="dpfp"`,
+`decay_mode="cubic_flux_chunked"`, `write_rule="additive"`, `key_feature_map="dpfp"`,
 `ffn_type="standard"`.
 
-> **Write-rule note.** The WikiText-2 ablation (§10) favors `additive` over
-> `delta` at seq 256 (PPL 183.6 vs 191.2, 3 seeds). The "delta wins at long
-> context" hypothesis is untested in LM. A pre-registered decision experiment
-> (train@256 → eval@2048; criterion: >2 SE) is running; the recipe will be
-> locked to its outcome. See `docs/internal_tr/SONRAKI_ADIMLAR_PLANI.md` (K2).
+> **Write-rule: LOCKED to `additive`** by the pre-registered K2 decision
+> experiment (§13): at eval 2048 delta does not beat additive by >2 SE — it is
+> numerically *worse* (additive ahead by 1.8 SE), and additive also leads at
+> 256 and 1024. Delta remains the tool for key-update/streaming niches
+> (2x multi-seed win, key-update task), and survives in grafting as the
+> learnable per-head alpha-gate hybrid (independent of this lock).
 
 ## 9. Parked / negative results (honest ledger)
 
@@ -137,6 +138,51 @@ all, while the identical models train fine at seq 256. This extends the §3
 finding (retention tasks) to language modeling: **train-short → infer-long is
 required**; long-context comparisons must evaluate short-trained weights at
 long lengths rather than train at length.
+
+## 12. External family baseline: GLA (K1 decision — passed)
+
+Equal-parameter pure-PyTorch GLA baseline (data-dependent per-channel forget
+gates, chunkwise parallel; Yang et al. 2023 family), WikiText-2, seq 256,
+per-mode LR sweep {3e-4, 5e-4, 1e-3} on seed 0, then 3 seeds at best LR (3e-4).
+GLA required three stabilizations to train at all (output LayerNorm, pre-LN,
+1/sqrt(H) logit scale — see CHANGELOG v2.2); it is deliberately a plain family
+representative (no windowed attention, elu+1 features).
+
+| model (3 seeds) | val loss | PPL |
+|---|---|---|
+| GLA (best LR 3e-4) | 5.4238 ± 0.0531 | 226.7 |
+| **HFP `cubic+additive+dpfp`** | **5.2127 ± 0.0035** | **183.6** |
+| HFP `cubic+delta+dpfp` | 5.2534 ± 0.0248 | 191.2 |
+
+**Pre-registered criterion (K1):** HFP-best within −2 SE of the GLA mean or
+better. **Result: passed decisively** — HFP-best − GLA = −0.2111 val loss
+(combined SE 0.0307, ≈ 6.9 SE in HFP's favor; 43 PPL). At equal parameters HFP
+does not merely match the efficient-recurrent family representative, it beats
+it, while adding the O(1)-state extra axes (retention law, capacity map).
+Honest note: GLA's seed variance is ~15x HFP's (0.053 vs 0.0035).
+
+## 13. Write-rule decision at long evaluation lengths (K2 — recipe locked)
+
+Train@256 → eval@{256, 1024, 2048}, 3 seeds each, per §11's train-short →
+infer-long requirement (val loss, PPL in parentheses):
+
+| eval len | cubic+additive+dpfp | cubic+delta+dpfp | GLA |
+|---|---|---|---|
+| 256 | **5.2404** (189) | 5.3008 (200) | 5.4443 (231) |
+| 1024 | **5.3052** (201) | 5.3623 (213) | 5.4148 (225) |
+| 2048 | **5.3618** (213) | 5.4154 (225) | 5.4195 (226) |
+
+**Pre-registered criterion (K2):** delta must beat additive by >2 SE at eval
+2048. **Result: hypothesis rejected** — additive − delta = −0.0536 (combined
+SE 0.0291): delta is numerically *worse* at every length. The official recipe
+is locked to `cubic+additive+dpfp` (§8); delta is reserved for
+key-update/streaming niches.
+
+**Honest observation (scaling input):** HFP degrades with evaluation length
+(PPL 189 → 213 at 8x train length) while GLA is flat (~225-231). HFP still
+leads at 2048 (213 vs 226), but the gap narrows from 42 to 13 PPL —
+long-length robustness is the next thing to attack (window size, decay
+horizons), not raw short-context quality.
 
 ## Reproduction
 

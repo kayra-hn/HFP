@@ -16,10 +16,11 @@
 - DPFP kapasite ekseni (Schlag ve ark. 2021): girişim-yoğun uzun gap'te baseline'ın 2-6×'i, öğrenmeyi de stabilize ediyor.
 - Delta yazım: anahtar-güncelleme görevinde çok-seed 2× (ort. %16→%33).
 - `cubic_flux` uzun-ufuk hipotezi DOĞRULANDI (cubic+dpfp 63.9% vs exp+dpfp 20.7%, >4 SE; Ek 16) — artık parked değil.
-- LM doğrulaması: WikiText-2 ablasyonu (3 seed) en iyi reçete `cubic_flux + additive + dpfp` PPL 183.6 (Ek 17); yazım kuralı kilidi K2 deneyini bekliyor.
+- LM doğrulaması: WikiText-2 ablasyonu (3 seed) en iyi reçete `cubic_flux + additive + dpfp` PPL 183.6 (Ek 17); yazım kuralı K2 ile **additive'e kilitlendi** (Ek 20).
+- GLA aile-baseline'ı — K1 GEÇTİ: HFP 183.6 vs GLA 226.7 PPL (≈6.9 SE, 3 seed; Ek 19).
 
 **Açık / kanıtlanmamış:**
-- Harici aile baseline'ı (GLA) koşuda — K1 sonucu bekleniyor; Mamba kıyası yok.
+- Mamba kıyası yok (GLA kıyası tamam, Ek 19).
 - Bazı pozitifler tek-seed (dpfp×1280 s2, streaming-mix s0).
 - İki-kademeli (two-tier) bellek: prototip doğrulandı ama adil test edilmedi (regime öğrenilemiyordu).
 
@@ -130,8 +131,8 @@ Sürücünün kapsadığı hücreler, amaç ve başarı kriterleri:
 2. **Two-tier (cubic-slow) öğrenilebilir rejimde uzun-gap'te iyileştiriyor mu?** Adil testi hiç yapılmadı.
 3. **exp'in çok-ölçekli λ'sı cubic'in avantajını ne kadar yiyor?** exp zaten multi-timescale; cubic'e ne kalıyor?
 4. **DPFP ölçekte nereye kadar?** key_dim 4× büyük modelde de girişim sınırını aşıyor mu, maliyet/fayda?
-5. **Delta chunkwise ölçekte:** güncelleme-ağır gerçek akışta (kod/diyalog) additive'i geçiyor mu? *(Karar deneyi tasarlandı ve koşuda: train@256 → eval@2048, önceden yazılı kriter — `colab_gla_benchmark_v3.ipynb` Görev B / plan K2.)*
-6. ~~**LM-benchmark:** gerçek dilde exp+dpfp, GLA/Mamba'ya karşı rekabetçi mi?~~ **(GPT-2'yi Geçti)** HFP, GPT-2'den daha iyi (PPL 257 vs 300). GLA/Mamba karşılaştırması henüz yapılmadı. Hangi bileşen (cubic, delta, dpfp) LM'i uçuruyor? (Ablasyon Notebook'u sürüyor).
+5. ~~**Delta chunkwise ölçekte:** dense LM'de additive'i geçiyor mu?~~ **(HAYIR — K2, Ek 20)** eval@2048'de delta sayısal olarak daha kötü (additive 1.8 SE önde); reçete additive'e kilitlendi. Güncelleme-ağır *gerçek akış* (kod/diyalog) nişi hâlâ açık — delta orada yaşıyor.
+6. ~~**LM-benchmark:** gerçek dilde HFP, GLA/Mamba'ya karşı rekabetçi mi?~~ **(GLA'yı da Geçti)** GPT-2: PPL 257 vs 300 (Ek 15). GLA: 183.6 vs 226.7, ≈6.9 SE (Ek 19). Bileşen ablasyonu tamam (Ek 17: cubic+additive+dpfp sinerjisi). Kalan: Mamba kıyası.
 7. **Grafting:** HFP-belleği pretrained modele distille edilebilir mi? *(BAŞLADI: `hfp/models/grafting.py` + `colab_graft_qwen_v2.ipynb`; Qwen2.5-1.5B, 13/28 katman, kafa-başına bellek, α-gate melez yazım, teacher-forcing distilasyon. Smoke 6/6 geçti; Stage 1 koşulacak. Plan K3.)*
 8. **Streaming kararlılığı pratik fark yaratıyor mu?** cubic'in self-limiting'i (max|M| çok küçük) çok uzun akışta exp'e görünür avantaj mı?
 
@@ -144,7 +145,7 @@ Sürücünün kapsadığı hücreler, amaç ve başarı kriterleri:
 - **cubic streaming kararlılığı:** yüksek. Patlamıyor (verify: max|M|=14 vs exp 254 @4000 token).
 - **DPFP ölçekte de kazanır:** orta-yüksek. Mekanizma ölçekten bağımsız (rank-collapse geciktirme).
 - **Grafting/distilasyon çalışır (exp+dpfp):** orta. Literatür destekliyor; cubic ile değil, exp ile denenmeli.
-- **HFP'nin LM'de GLA/Mamba'yı geçmesi:** düşük. Amaç geçmek değil, "aile-standardı kadar iyi + O(1) + ekstra eksenler" konumu.
+- ~~**HFP'nin LM'de GLA/Mamba'yı geçmesi:** düşük.~~ **Gerçekleşti (GLA için):** beklentinin aksine HFP GLA'yı 43 PPL geçti (Ek 19) — kalibrasyon hatası dürüstçe not edilir; Mamba kıyası hâlâ açık.
 
 ---
 
@@ -173,10 +174,10 @@ Sürücünün kapsadığı hücreler, amaç ve başarı kriterleri:
 
 ## 10. Deneyler bitince — güncelleme checklist
 
-- [x] `DENEY_SONUCLARI.md` — cubic karar deneyi (Ek 16) + WikiText ablasyonu (Ek 17) + cliff (Ek 18) işlendi. Kalan: GLA baseline + K2 + grafting ekleri (sonuç bekliyor).
-- [ ] `RESULTS.md` — özet tablo + "Standing open items"tan kapananları taşı.
+- [x] `DENEY_SONUCLARI.md` — Ek 16-18 + GLA/K1 (Ek 19) + K2 reçete kilidi (Ek 20) işlendi. Kalan: grafting ekleri (K3 bekliyor).
+- [x] `RESULTS.md` — §12 (GLA/K1), §13 (K2 kilidi), §8 reçete güncellendi. Kalan: grafting bölümü (K3).
 - [ ] `osf_companion.tex` → yeniden derle → `osf_companion.pdf` (v2.3); OSF'e yükle.
-- [ ] HF model card + GitHub README — değişen reçete/sonuç varsa hizala.
+- [x] GitHub README reçete + GLA konumlandırması hizalandı. Kalan: HF model card (K3 sonrası).
 - [x] Karar: cubic_flux kazandı mı? → **DOĞRULANDI** (uzun-ufuk karar deneyi: cubic+dpfp 63.9% vs exp+dpfp 20.7%, >4 SE, her iki kolda LR taramalı; RESULTS §6 / DENEY_SONUCLARI Ek 16. WikiText-2'de de en iyi reçetenin parçası: cubic+additive+dpfp PPL 183.6, RESULTS §10).
 
 ---

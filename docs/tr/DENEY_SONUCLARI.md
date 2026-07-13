@@ -480,3 +480,35 @@ sorunsuz öğreniyor. Ek 13'teki eğitilebilirlik bulgusunu dil modellemeye
 genişletir: **kısa eğit → uzun koş (train-short → infer-long) LM için de
 zorunludur**; uzun-bağlam kıyasları uzunlukta eğiterek değil, kısa eğitilmiş
 ağırlıkları uzun değerlendirerek yapılmalıdır.
+
+
+## Ek 19: GLA Aile-Baseline'ı — K1 Karar Kapısı (GEÇTİ ✅)
+
+- **Tarih:** 2026-07-13
+- **Test:** `colab_gla_benchmark_v3.ipynb` Görev A (Kaggle/Colab, GPU)
+- **Tasarım:** Eşit-parametreli saf-PyTorch GLA (veri-bağımlı kanal-başına unutma kapıları, chunkwise paralel; Yang ve ark. 2023 ailesi). WikiText-2, seq 256; LR taraması {3e-4, 5e-4, 1e-3} seed-0'da, en iyi LR (3e-4) ile 3 seed.
+- **Dürüst not:** Naif GLA LM ölçeğinde diverge etti; üç stabilizasyon gerekti (çıkış LayerNorm, pre-LN, 1/√H logit ölçeği — CHANGELOG v2.2). Kasıtlı olarak sade aile temsilcisi (pencereli attention yok, elu+1 feature).
+
+| model (3 seed) | val loss | PPL |
+|---|---|---|
+| GLA (en iyi LR 3e-4) | 5.4238 ± 0.0531 | 226.7 |
+| **HFP `cubic+additive+dpfp`** | **5.2127 ± 0.0035** | **183.6** |
+| HFP `cubic+delta+dpfp` | 5.2534 ± 0.0248 | 191.2 |
+
+- **Önceden kayıtlı kriter (K1):** HFP-best, GLA ortalamasının −2 SE bandında veya üstünde ise aile-standardı doğrulanır.
+- **Sonuç: KESİN GEÇTİ.** HFP-best − GLA = −0.2111 val loss (birleşik SE 0.0307, HFP lehine ≈6.9 SE; 43 PPL). Eşit parametrede HFP aile temsilcisine yetişmekle kalmıyor, geçiyor — üstüne O(1)-state ekstra eksenleri (retention yasası, kapasite haritası) ekliyor. GLA'nın seed-varyansı HFP'nin ~15 katı (0.053 vs 0.0035).
+
+## Ek 20: Yazım Kuralı Uzun-Bağlam Kararı — K2 Kapısı (delta hipotezi REDDEDİLDİ, reçete kilitlendi)
+
+- **Tarih:** 2026-07-13
+- **Test:** `colab_gla_benchmark_v3.ipynb` Görev B v2; train@256 → eval@{256, 1024, 2048}, 3'er seed (Ek 18'in train-short → infer-long zorunluluğuna uygun).
+
+| eval uzunluğu | cubic+additive+dpfp | cubic+delta+dpfp | GLA |
+|---|---|---|---|
+| 256 | **5.2404** (PPL 189) | 5.3008 (200) | 5.4443 (231) |
+| 1024 | **5.3052** (201) | 5.3623 (213) | 5.4148 (225) |
+| 2048 | **5.3618** (213) | 5.4154 (225) | 5.4195 (226) |
+
+- **Önceden kayıtlı kriter (K2):** delta, additive'i eval-2048'de >2 SE geçerse hipotez doğrulanır, resmi reçete delta kalır.
+- **Sonuç: hipotez REDDEDİLDİ.** additive − delta = −0.0536 (birleşik SE 0.0291) — delta her uzunlukta sayısal olarak *daha kötü*. Resmi reçete **`cubic+additive+dpfp`** olarak kilitlendi (RESULTS §8); delta yalnız key-update/streaming nişinde (Ek 11'deki 2× çok-seed kazancı geçerli). Grafting'deki α-gate melezi bu karardan bağımsız yaşar (kafa başına model kendisi seçiyor).
+- **Dürüst gözlem (ölçekleme girdisi):** HFP eval uzunluğuyla degrade oluyor (PPL 189 → 213, 8× eğitim uzunluğunda), GLA ise düz (~225-231). HFP 2048'de hâlâ önde (213 vs 226) ama makas 42'den 13 PPL'ye daralıyor — sıradaki saldırı hedefi uzun-uzunluk sağlamlığı (pencere boyutu, decay ufukları).

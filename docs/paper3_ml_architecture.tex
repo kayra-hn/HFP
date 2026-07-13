@@ -108,15 +108,19 @@ An ablation study was conducted on WikiText-2 (16M parameters, seq length 256, 3
 While \code{delta} writes were required to fix \code{dpfp} interference under the exponential baseline, the state-magnitude-dependent decay of \code{cubic\_flux} synergizes optimally with \code{additive} writes and \code{dpfp}, yielding a massive 10.3 PPL reduction over the standard architecture. This validates \textbf{\code{cubic\_flux + additive + dpfp}} as the target recipe for scaling.
 
 \section{External family baseline: Gated Linear Attention}
-% TASLAK — [SONUC:...] alanlari Gorev A/B ciktilariyla doldurulacak.
+% Gorev A/B sonuclari islendi (2026-07-13). Grafting [SONUC] alanlari K3 bekliyor.
 To position HFP against the efficient-recurrent family, an equal-parameter
 pure-PyTorch GLA baseline (data-dependent per-channel forget gates, chunkwise
 parallel; Yang et al.\ 2023 family) was trained under the identical WikiText-2
 protocol with a per-mode learning-rate sweep ($\{3\mathrm{e}{-4},
 5\mathrm{e}{-4}, 1\mathrm{e}{-3}\}$, best selected on seed~0, then 3 seeds).
-Best GLA: LR $3\mathrm{e}{-4}$, val loss [SONUC: ort $\pm$ std], PPL [SONUC]
-(seed-0: 5.458, PPL $\approx$ 234). HFP-best (\code{cubic+additive+dpfp},
-PPL 183.6) [SONUC: leads by X PPL / criterion verdict].
+Best GLA: LR $3\mathrm{e}{-4}$, val loss $5.4238 \pm 0.0531$, PPL 226.7
+(3 seeds). HFP-best (\code{cubic+additive+dpfp}, val loss $5.2127 \pm 0.0035$,
+PPL 183.6) leads by 43.1 PPL --- a val-loss margin of $0.2111$ at combined
+SE $0.0307$ ($\approx 6.9$~SE). The pre-registered family-standard criterion
+(HFP within $-2$~SE of the GLA mean or better) is passed decisively: at equal
+parameters HFP beats, not merely matches, the family representative. GLA's
+seed variance is $\sim$15$\times$ HFP's (0.053 vs.\ 0.0035).
 
 \emph{Honest note on baseline construction.} The naive equal-parameter GLA
 diverged at LM scale and required three standard stabilizations (output
@@ -132,8 +136,16 @@ Training directly at long context hits the trainability cliff (see below), so
 the write-rule question (additive vs.\ delta) is decided by evaluating
 seq-256-trained weights at longer lengths. Pre-registered criterion: delta
 must beat additive by $>2$ combined SE at eval length 2048.
-Result: [SONUC: tablo + hukum]. The official recipe is therefore
-[SONUC: recete].
+Result (3 seeds per arm, val loss): additive 5.2404/5.3052/5.3618 vs.\
+delta 5.3008/5.3623/5.4154 at eval 256/1024/2048; additive $-$ delta
+$= -0.0536$ at 2048 (combined SE 0.0291) --- delta fails the criterion and is
+numerically worse at every length. The official recipe is therefore
+\code{cubic\_flux + additive + dpfp}; delta is reserved for
+key-update/streaming niches and survives in grafting as the learnable
+per-head alpha-gate. A scaling-relevant observation: HFP degrades with
+evaluation length (PPL 189 $\to$ 213 at $8\times$ train length) while GLA is
+flat ($\sim$225--231); HFP still leads at 2048 (213 vs.\ 226) but the margin
+narrows from 42 to 13 PPL.
 
 \emph{Negative result, LM trainability cliff.} Direct training at seq 1024
 leaves both write rules at the $\ln|V|$ plateau in all 3 seeds while the same

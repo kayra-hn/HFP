@@ -99,10 +99,17 @@ Headline findings (small scale, synthetic recall; patterns are seed-robust):
 - **DPFP capacity axis** (`key_feature_map="dpfp"`) is the first mechanism with a
   clear, 3-seed advantage: ~2-6x baseline accuracy at long gaps under high
   interference, and it stabilizes training across seeds.
-- **Recommended configuration**: `exp` decay + additive writes + `dpfp` features +
-  `ffn_type="standard"`, dense multi-query training data.
+- **Official recipe (locked)**: `cubic_flux_chunked` decay + `additive` writes +
+  `dpfp` features + `ffn_type="standard"` (WikiText-2 ablation, RESULTS §10; write
+  rule locked by the pre-registered K2 experiment, RESULTS §13).
 - **`cubic_flux` long-horizon win**: In sparse, long-gap regimes (gap ≥ 256), `cubic_flux_chunked` paired with DPFP outperforms the exponential baseline significantly (3x recall advantage), validating the core long-horizon hypothesis.
-- **Language Modeling**: HFP (`cubic_flux` + `delta` + `dpfp`) outperforms GPT-2 (Transformer baseline) in small-scale LM benchmarks (TinyShakespeare), proving the viability of the O(1) recurrent state for text modeling.
+- **Language Modeling**: HFP outperforms GPT-2 (Transformer baseline) on
+  TinyShakespeare (PPL ~257 vs ~300, 3 seeds), proving the viability of the O(1)
+  recurrent state for text modeling.
+- **Positioned against the efficient-recurrent family (K1, passed)**: at equal
+  parameters on WikiText-2, HFP-best reaches PPL 183.6 vs 226.7 for a stabilized
+  GLA baseline (≈6.9 SE, 3 seeds, per-mode LR sweep; RESULTS §12) — and keeps the
+  lead at 8x training length (213 vs 226 at eval 2048, RESULTS §13).
 
 ## Usage
 
