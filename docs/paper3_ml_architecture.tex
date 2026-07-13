@@ -115,12 +115,16 @@ parallel; Yang et al.\ 2023 family) was trained under the identical WikiText-2
 protocol with a per-mode learning-rate sweep ($\{3\mathrm{e}{-4},
 5\mathrm{e}{-4}, 1\mathrm{e}{-3}\}$, best selected on seed~0, then 3 seeds).
 Best GLA: LR $3\mathrm{e}{-4}$, val loss $5.4238 \pm 0.0531$, PPL 226.7
-(3 seeds). HFP-best (\code{cubic+additive+dpfp}, val loss $5.2127 \pm 0.0035$,
-PPL 183.6) leads by 43.1 PPL --- a val-loss margin of $0.2111$ at combined
-SE $0.0307$ ($\approx 6.9$~SE). The pre-registered family-standard criterion
-(HFP within $-2$~SE of the GLA mean or better) is passed decisively: at equal
-parameters HFP beats, not merely matches, the family representative. GLA's
-seed variance is $\sim$15$\times$ HFP's (0.053 vs.\ 0.0035).
+(3 seeds, correct next-token objective). \emph{Metric-artifact disclosure
+(post-run):} the HFP arms were inadvertently trained and evaluated with a
+doubly-shifted target (skip-one prediction, $x_{t+2}$), so the previously
+reported HFP value (183.6) is not a next-token perplexity and the original
+criterion verdict is \textbf{withdrawn}. A corrected single-seed rerun under
+the proper objective reaches next-token PPL 55.4 (seq 256) --- directionally
+far ahead of GLA --- but with full causal attention enabled (the O(1) windowed
+configuration was not engaged in LM runs). The family-standard claim is
+suspended until a matched-objective, resource-matched (windowed) rerun exists.
+GLA's seed variance note stands (0.053).
 
 \emph{Honest note on baseline construction.} The naive equal-parameter GLA
 diverged at LM scale and required three standard stabilizations (output
@@ -142,10 +146,15 @@ $= -0.0536$ at 2048 (combined SE 0.0291) --- delta fails the criterion and is
 numerically worse at every length. The official recipe is therefore
 \code{cubic\_flux + additive + dpfp}; delta is reserved for
 key-update/streaming niches and survives in grafting as the learnable
-per-head alpha-gate. A scaling-relevant observation: HFP degrades with
-evaluation length (PPL 189 $\to$ 213 at $8\times$ train length) while GLA is
-flat ($\sim$225--231); HFP still leads at 2048 (213 vs.\ 226) but the margin
-narrows from 42 to 13 PPL.
+per-head alpha-gate. (Both write-rule arms shared the same skip-one artifact
+objective, so this decision is unaffected by the disclosure above.) A
+scaling-relevant observation: HFP degrades with evaluation length; a
+pre-registered single-seed probe attributes the degradation to attention-range
+and positional-encoding extrapolation, not to the recurrent memory ---
+imposing the training-time window at evaluation plus tiling the positional
+encoding removes it entirely (corrected-objective: 4.015 @256 vs.\ 3.983
+@2048), while per-position loss at 2048 is flat. The memory path is
+length-robust.
 
 \emph{Negative result, LM trainability cliff.} Direct training at seq 1024
 leaves both write rules at the $\ln|V|$ plateau in all 3 seeds while the same

@@ -50,6 +50,13 @@
 ## 1. Karar kapıları (ÖNCEDEN yazılı kriterler)
 
 ### K1 — Aile-standardı (GLA baseline)
+
+> **[DURUM 2026-07-13]** İlk "GEÇTİ" hükmü geri çekildi: metrik artefaktı
+> (çift-kaydırma, DENEY_SONUCLARI Ek 21) HFP kollarını skip-one hedefiyle
+> koşturmuştu; ayrıca LM config'i penceresiz (tam attention) çıktı.
+> Düzeltilmiş tek-seed prob yönü güçlü koruyor (next-token PPL 55.4 vs
+> GLA 226.7). Resmî hüküm: FIX M1 + pencereli O(1) config + 3 seed
+> yeniden koşumda. Aşağıdaki kriter metni değişmedi.
 > HFP-best (`cubic+additive+dpfp`, 183.6), GLA'nın en iyi LR'ındaki 3-seed
 > ortalamasının −2 SE bandında veya üstündeyse → "aile-standardı kadar iyi +
 > O(1) + ekstra eksenler" konumu DOĞRULANDI.

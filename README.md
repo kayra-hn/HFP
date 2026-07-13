@@ -106,10 +106,11 @@ Headline findings (small scale, synthetic recall; patterns are seed-robust):
 - **Language Modeling**: HFP outperforms GPT-2 (Transformer baseline) on
   TinyShakespeare (PPL ~257 vs ~300, 3 seeds), proving the viability of the O(1)
   recurrent state for text modeling.
-- **Positioned against the efficient-recurrent family (K1, passed)**: at equal
-  parameters on WikiText-2, HFP-best reaches PPL 183.6 vs 226.7 for a stabilized
-  GLA baseline (≈6.9 SE, 3 seeds, per-mode LR sweep; RESULTS §12) — and keeps the
-  lead at 8x training length (213 vs 226 at eval 2048, RESULTS §13).
+- **GLA family comparison — under revision (honest note)**: a metric artifact
+  (double-shifted labels; RESULTS §14) made the published HFP-vs-GLA numbers
+  non-comparable. A corrected single-seed probe reaches next-token PPL 55.4
+  (seq 256) vs GLA's 226.7, but with full attention enabled; the
+  resource-matched O(1) comparison is being re-established before any claim.
 
 ## Usage
 

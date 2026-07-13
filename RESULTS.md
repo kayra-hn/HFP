@@ -85,7 +85,9 @@ This 3x absolute advantage (>4 SE) validates the core physical hypothesis that p
 
 ## 7. Initial Language Modeling Viability
 
-In a multi-seed benchmark on TinyShakespeare (~16M params, 300K tokens):
+In a multi-seed benchmark on TinyShakespeare (~16M params, 300K tokens;
+both models shared the same skip-one objective — ranking valid, absolute
+values mislabeled, see §14):
 - GPT-2 (Transformer baseline): Val Loss 5.703 (PPL ~300)
 - **HFP** (`cubic_flux` + `delta` + `dpfp`): **Val Loss 5.548 (PPL ~257)**
 
@@ -111,6 +113,10 @@ HFP outperforms the full-attention baseline, confirming the O(1) recurrent archi
 - Single-seed results anywhere in this file are labeled as such; everything marked 3-seed is seed-robust in pattern, not in absolute numbers.
 
 ## 10. Language Modeling Validation (WikiText-2)
+
+> **[Metric note, 2026-07-13]** All arms shared a double-shifted target
+> (skip-one objective, §14): the component *ranking* is valid, but the
+> absolute values are not next-token perplexities.
 
 A definitive multi-seed (seeds 0, 1, 2) ablation was conducted on the WikiText-2 dataset (16M parameters, seq length 256) to validate the architectural components on dense language modeling. 
 
@@ -139,7 +145,15 @@ finding (retention tasks) to language modeling: **train-short → infer-long is
 required**; long-context comparisons must evaluate short-trained weights at
 long lengths rather than train at length.
 
-## 12. External family baseline: GLA (K1 decision — passed)
+## 12. External family baseline: GLA (K1 decision — WITHDRAWN, see §14)
+
+> **[Revision 2026-07-13]** This comparison mixed objectives: a metric artifact
+> (double-shifted labels, §14) means the HFP values below are *skip-one*
+> scores while GLA's are correct next-token perplexities. The original
+> "passed" verdict is withdrawn until a clean matched-objective re-run.
+> A corrected single-seed probe suggests the verdict will survive
+> (next-token PPL 55.4 vs 226.7) but with a fairness caveat: the HFP LM
+> config ran full attention, not the O(1) windowed configuration (§14).
 
 Equal-parameter pure-PyTorch GLA baseline (data-dependent per-channel forget
 gates, chunkwise parallel; Yang et al. 2023 family), WikiText-2, seq 256,
@@ -163,6 +177,12 @@ Honest note: GLA's seed variance is ~15x HFP's (0.053 vs 0.0035).
 
 ## 13. Write-rule decision at long evaluation lengths (K2 — recipe locked)
 
+> **[Metric note, 2026-07-13]** Both HFP arms shared the same (artifact)
+> objective (§14), so the additive-over-delta decision **stands**; absolute
+> values are skip-one scores, and the GLA column (correct next-token) is not
+> directly comparable to the HFP columns. The degradation *pattern* is real
+> and is diagnosed in §14.
+
 Train@256 → eval@{256, 1024, 2048}, 3 seeds each, per §11's train-short →
 infer-long requirement (val loss, PPL in parentheses):
 
@@ -183,6 +203,44 @@ key-update/streaming niches.
 leads at 2048 (213 vs 226), but the gap narrows from 42 to 13 PPL —
 long-length robustness is the next thing to attack (window size, decay
 horizons), not raw short-context quality.
+
+## 14. Metric-artifact disclosure and length-degradation diagnosis (probe, single seed)
+
+**The artifact.** All HFP LM numbers in §7, §10, §12, §13 were produced with a
+double-shifted target: training/eval code passed pre-shifted labels into models
+that also shift internally (`HFPForCausalLM`, `GPT2LMHeadModel`), making the
+effective objective *skip-one* prediction (x[t+2]), not next-token. Same-objective
+comparisons (§7, §10, §13) remain valid as rankings; the §12 GLA comparison mixed
+objectives and is withdrawn as published. Empirical calibration (probe): a
+correctly-trained model scores next-token 4.017 (PPL 55.5) but 9.599 (PPL 14745)
+on the skip-one pairing — the metrics are not interchangeable. Fixed in
+`train.py` (FIX M1); probe code: `notebooks/degradation_probe_cell.py`.
+
+**Corrected single-seed numbers** (train@256, correct next-token, otherwise the
+§13 protocol): 4.0145 (PPL 55.4) @256 → 4.0452 (57.1) @1024 → 4.0677 (58.4)
+@2048. Caveat: this LM configuration runs **full causal attention** plus the
+recurrent memory (`local_window` was never set in LM runs, unlike the retention
+experiments which used `local_window=8`) — it is a hybrid, not the O(1)
+configuration. Re-establishing K1 requires the matched-objective GLA comparison
+and an O(1)-windowed HFP LM run.
+
+**Length-degradation diagnosis** (pre-registered probe design):
+
+| eval variant | @256 | @2048 | gap |
+|---|---|---|---|
+| E0 standard | 4.0145 | 4.0677 | +0.053 |
+| E1 eval-time `local_window=256` | 4.0295 | 4.0380 | +0.009 |
+| E2 window + PE tiled mod-256 | 3.9973 | 3.9829 | −0.014 |
+
+Per-position loss @2048 is flat (4.01–4.11; no cliff at 256, no monotonic
+growth). Verdict: the degradation is **attention-driven, not memory-driven** —
+imposing the training-time attention range at eval removes most of the gap,
+tiling the positional encoding removes the rest (E2 @2048 matches or beats the
+model's own @256 score, within sampling noise ±0.02). No evidence of
+memory-state OOD: the recurrent memory path is length-robust, consistent with §3.
+Practical consequence: train-short/full-attention → deploy with eval-time
+window + tiled PE is a zero-training fix that is simultaneously length-stable
+and O(1) at inference. (Single seed; diagnostic, not a headline claim.)
 
 ## Reproduction
 

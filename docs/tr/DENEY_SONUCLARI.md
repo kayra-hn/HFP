@@ -482,7 +482,13 @@ zorunludur**; uzun-bağlam kıyasları uzunlukta eğiterek değil, kısa eğitil
 ağırlıkları uzun değerlendirerek yapılmalıdır.
 
 
-## Ek 19: GLA Aile-Baseline'ı — K1 Karar Kapısı (GEÇTİ ✅)
+## Ek 19: GLA Aile-Baseline'ı — K1 Karar Kapısı (GERİ ÇEKİLDİ — bkz. Ek 21)
+
+> **[Revizyon 2026-07-13]** Metrik artefaktı (Ek 21): buradaki HFP sayıları
+> skip-one hedefli, GLA doğru next-token — kıyas elma-armut. "GEÇTİ" hükmü
+> temiz yeniden koşuma kadar geri çekildi. Düzeltilmiş tek-seed prob yönü
+> koruyor (next-token PPL 55.4 vs 226.7) ama HFP tam-attention'lıydı
+> (kaynak-eşleşmesi adil değil).
 
 - **Tarih:** 2026-07-13
 - **Test:** `colab_gla_benchmark_v3.ipynb` Görev A (Kaggle/Colab, GPU)
@@ -500,6 +506,11 @@ ağırlıkları uzun değerlendirerek yapılmalıdır.
 
 ## Ek 20: Yazım Kuralı Uzun-Bağlam Kararı — K2 Kapısı (delta hipotezi REDDEDİLDİ, reçete kilitlendi)
 
+> **[Metrik notu, 2026-07-13]** İki HFP kolu da aynı (artefaktlı) hedefi
+> paylaştı → additive > delta HÜKMÜ AYAKTA; mutlak değerler skip-one,
+> GLA sütunu doğrudan kıyaslanamaz (Ek 21). Degradasyon deseninin teşhisi
+> Ek 21'de: attention kaynaklı, bellek değil.
+
 - **Tarih:** 2026-07-13
 - **Test:** `colab_gla_benchmark_v3.ipynb` Görev B v2; train@256 → eval@{256, 1024, 2048}, 3'er seed (Ek 18'in train-short → infer-long zorunluluğuna uygun).
 
@@ -512,3 +523,43 @@ ağırlıkları uzun değerlendirerek yapılmalıdır.
 - **Önceden kayıtlı kriter (K2):** delta, additive'i eval-2048'de >2 SE geçerse hipotez doğrulanır, resmi reçete delta kalır.
 - **Sonuç: hipotez REDDEDİLDİ.** additive − delta = −0.0536 (birleşik SE 0.0291) — delta her uzunlukta sayısal olarak *daha kötü*. Resmi reçete **`cubic+additive+dpfp`** olarak kilitlendi (RESULTS §8); delta yalnız key-update/streaming nişinde (Ek 11'deki 2× çok-seed kazancı geçerli). Grafting'deki α-gate melezi bu karardan bağımsız yaşar (kafa başına model kendisi seçiyor).
 - **Dürüst gözlem (ölçekleme girdisi):** HFP eval uzunluğuyla degrade oluyor (PPL 189 → 213, 8× eğitim uzunluğunda), GLA ise düz (~225-231). HFP 2048'de hâlâ önde (213 vs 226) ama makas 42'den 13 PPL'ye daralıyor — sıradaki saldırı hedefi uzun-uzunluk sağlamlığı (pencere boyutu, decay ufukları).
+
+
+## Ek 21: Metrik Artefaktı İfşası + Degradasyon Teşhisi (tek-seed prob)
+
+- **Tarih:** 2026-07-13
+- **Tetikleyici:** Ek 20'deki uzunluk degradasyonunun ("neden?") kod incelemesi.
+- **Bulgu 1 — çift-kaydırma artefaktı:** LM eğitim/eval kodları dışarıdan
+  kaydırılmış etiketi, içeride de kaydıran modellere verdi (`HFPForCausalLM`,
+  `GPT2LMHeadModel`) → fiilî hedef next-token değil **skip-one** (x[t+2]).
+  Etki haritası: Ek 15 (GPT-2 kıyası) ve Ek 17 (ablasyon) iki kol da aynı
+  hedefte → SIRALAMALAR geçerli, mutlaklar yanlış etiketli. Ek 19 (GLA)
+  hedef karışık → geri çekildi. Ek 20 iç kıyası adil. Retention deneyleri
+  ve grafting hattı temiz. Düzeltme: train.py FIX M1; prob:
+  `notebooks/degradation_probe_cell.py`.
+- **Kalibrasyon (prob):** doğru hedefle eğitilen model: next-token 4.017
+  (PPL 55.5) vs skip-one eşlemesiyle 9.599 (PPL 14745) — iki metrik
+  birbirinin yerine geçmez.
+- **Düzeltilmiş tek-seed sayılar** (train@256, doğru hedef, Ek 20 protokolü):
+  4.0145 (PPL 55.4) @256 → 4.0452 (57.1) @1024 → 4.0677 (58.4) @2048.
+  UYARI: LM konfigürasyonunda `local_window` hiç verilmemişti → bu koşular
+  **tam causal attention + bellek** hibriti (retention deneyleri window=8
+  ile gerçek O(1)'di). K1'in yeniden kurulması için: eş-hedefli GLA kıyası +
+  pencereli O(1) HFP LM koşusu.
+- **Bulgu 2 — degradasyon teşhisi (ön-kayıtlı tasarım):**
+
+| eval varyantı | @256 | @2048 | fark |
+|---|---|---|---|
+| E0 standart | 4.0145 | 4.0677 | +0.053 |
+| E1 eval'de `local_window=256` | 4.0295 | 4.0380 | +0.009 |
+| E2 window + PE mod-256 döşeme | 3.9973 | 3.9829 | −0.014 |
+
+  Pozisyon-başına loss @2048 düz (4.01-4.11; 256'da kırılma yok, monoton
+  artış yok). **Hüküm: degradasyon attention kaynaklı, bellek kaynaklı
+  değil** — eğitim menzili eval'de dayatılınca farkın büyük kısmı, PE
+  döşemesiyle kalanı kapanıyor (E2 @2048, modelin kendi @256 skorunu
+  örnekleme gürültüsü ±0.02 içinde yakalıyor/geçiyor). Bellek yolu (M, z)
+  uzunlukta sağlam — Ek 6-7'nin uzunluk-genellemesi bulgusuyla tutarlı.
+- **Pratik sonuç:** kısa-eğit/tam-attention → eval'de pencere + PE döşemesi
+  = sıfır-eğitim maliyetli, uzunluk-kararlı ve çıkarımda O(1) dağıtım modu.
+- **Etiket:** tek seed; teşhis koşusu, manşet iddiası değil.
