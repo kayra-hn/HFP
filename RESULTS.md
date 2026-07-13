@@ -109,17 +109,6 @@ HFP outperforms the full-attention baseline, confirming the O(1) recurrent archi
   first). (`two_tier.py`)
 - Single-seed results anywhere in this file are labeled as such; everything marked 3-seed is seed-robust in pattern, not in absolute numbers.
 
-## Reproduction
-
-```bash
-python smoke_test.py
-python review_scripts/verify_claims.py
-python review_scripts/dense_retention.py exp additive 1e-3 0
-python review_scripts/length_gen.py train 0 && python review_scripts/length_gen.py eval 0
-LG_VARIANT=dpfp python review_scripts/length_gen.py train 0
-python review_scripts/interference_eval.py 0
-```
-
 ## 10. Language Modeling Validation (WikiText-2)
 
 A definitive multi-seed (seeds 0, 1, 2) ablation was conducted on the WikiText-2 dataset (16M parameters, seq length 256) to validate the architectural components on dense language modeling. 
@@ -148,3 +137,14 @@ all, while the identical models train fine at seq 256. This extends the §3
 finding (retention tasks) to language modeling: **train-short → infer-long is
 required**; long-context comparisons must evaluate short-trained weights at
 long lengths rather than train at length.
+
+## Reproduction
+
+```bash
+python smoke_test.py
+python review_scripts/verify_claims.py
+python review_scripts/dense_retention.py exp additive 1e-3 0
+python review_scripts/length_gen.py train 0 && python review_scripts/length_gen.py eval 0
+LG_VARIANT=dpfp python review_scripts/length_gen.py train 0
+python review_scripts/interference_eval.py 0
+```

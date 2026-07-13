@@ -15,12 +15,11 @@
 - Bellek girişim-sınırlı, decay-sınırlı değil.
 - DPFP kapasite ekseni (Schlag ve ark. 2021): girişim-yoğun uzun gap'te baseline'ın 2-6×'i, öğrenmeyi de stabilize ediyor.
 - Delta yazım: anahtar-güncelleme görevinde çok-seed 2× (ort. %16→%33).
-- Önerilen reçete: `exp` + additive + `dpfp` + `ffn_type="standard"`.
+- `cubic_flux` uzun-ufuk hipotezi DOĞRULANDI (cubic+dpfp 63.9% vs exp+dpfp 20.7%, >4 SE; Ek 16) — artık parked değil.
+- LM doğrulaması: WikiText-2 ablasyonu (3 seed) en iyi reçete `cubic_flux + additive + dpfp` PPL 183.6 (Ek 17); yazım kuralı kilidi K2 deneyini bekliyor.
 
 **Açık / kanıtlanmamış:**
-- `cubic_flux` bu ölçekte exp'in gerisinde, seed-kırılgan → uzun-ufuk hipotezi olarak parked (asıl özgün fikir; henüz kendini kanıtlamadı).
-- Harici aile baseline'ı (GLA/Mamba) hiç koşulmadı → hiçbir dış-karşılaştırma yok.
-- LM-benchmark yok; her şey ≤1M param, sentetik recall, CPU.
+- Harici aile baseline'ı (GLA) koşuda — K1 sonucu bekleniyor; Mamba kıyası yok.
 - Bazı pozitifler tek-seed (dpfp×1280 s2, streaming-mix s0).
 - İki-kademeli (two-tier) bellek: prototip doğrulandı ama adil test edilmedi (regime öğrenilemiyordu).
 
@@ -174,11 +173,11 @@ Sürücünün kapsadığı hücreler, amaç ve başarı kriterleri:
 
 ## 10. Deneyler bitince — güncelleme checklist
 
-- [ ] `DENEY_SONUCLARI.md` — yeni ekler (GLA baseline, saf-bellek, çok-seed teyitleri, cubic karar deneyi).
+- [x] `DENEY_SONUCLARI.md` — cubic karar deneyi (Ek 16) + WikiText ablasyonu (Ek 17) + cliff (Ek 18) işlendi. Kalan: GLA baseline + K2 + grafting ekleri (sonuç bekliyor).
 - [ ] `RESULTS.md` — özet tablo + "Standing open items"tan kapananları taşı.
 - [ ] `osf_companion.tex` → yeniden derle → `osf_companion.pdf` (v2.3); OSF'e yükle.
 - [ ] HF model card + GitHub README — değişen reçete/sonuç varsa hizala.
-- [ ] Karar: cubic_flux kazandı mı? (parked → doğrulandı / reddedildi.)
+- [x] Karar: cubic_flux kazandı mı? → **DOĞRULANDI** (uzun-ufuk karar deneyi: cubic+dpfp 63.9% vs exp+dpfp 20.7%, >4 SE, her iki kolda LR taramalı; RESULTS §6 / DENEY_SONUCLARI Ek 16. WikiText-2'de de en iyi reçetenin parçası: cubic+additive+dpfp PPL 183.6, RESULTS §10).
 
 ---
 

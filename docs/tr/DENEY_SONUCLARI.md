@@ -325,47 +325,6 @@ düşük (4.2-5.8 vs 5.4-9.8). **Delta artık çok-seed'li, sağlam bir mekanizm
 kazancı** — niş: güncelleme-ağır akışlar. (Ek 10'un tek-seed "mütevazı" sonucu
 yanıltıcıymış; additive s0'da şanslıydı.)
 
-### Ek 14: Karar Deneyi (Additive vs Delta) - Streaming Mix
-- **Tarih:** 2026-07-07
-- **Test:** `kaggle_streaming_mix_test.ipynb` (3 Seed, Ctx 160 ve 640)
-- **Mimari:** `cubic_flux_chunked` + `dpfp`
-- **Bulgular:** 3 Seed'in ortalaması alındığında:
-  - **Kısa Bağlam (Ctx 160):** Additive %34.8 güncellenen bilgi tutarken, Delta bu oranı **%52.8**'e çıkardı. (+18% mutlak sıçrama).
-  - **Uzun Bağlam (Ctx 640):** Additive %14.7 güncellenen bilgi tutarken, Delta **%28.6**'ya ulaştı (neredeyse 2 kat performans). Stale (bayat) bilgi oranı ise yarı yarıya azaldı (Ortalama %6.8 -> %3.7).
-  - Delta, Seed 0 ve 2'de muazzam bir fark atarken, en kötü koşusu olan Seed 1'de bile Additive'den daha iyi performans sergiledi.
-- **Karar:** Delta yazım kuralı, özellikle uzun bağlamlarda (ctx=640) bilgiyi güncelleme ve bayat veriyi unutma konusunda Additive kuralına göre **2 kat daha başarılı** olduğunu kanıtlamıştır. Eğitim sırasında 2.2x yavaş olmasına rağmen, cihaz-içi (on-device) çıkarım (inference) hızları ve O(1) bellek tüketimleri birebir aynı olduğu için, kazanılan bu muazzam hafıza kapasitesi yavaşlığa kesinlikle değmektedir. **Faz 2 (Dil Modelleme) için HFP'nin yazım kuralı DELTA olarak belirlenmiştir.** Nihai reçete: `Cubic (Çürüme) + Delta (Yazım) + DPFP (Kapasite)`.
-
-### Ek 15: Faz 2.1 — Gerçek Dil Modelleme Benchmark'ı (TinyShakespeare, çok-seed)
-- **Tarih:** 2026-07-07
-- **Test:** `kaggle_lm_benchmark.ipynb` (2× T4 GPU paralel, 12 koşu)
-- **Karşılaştırma:** GPT-2 (Transformer Baseline) vs HFP (`cubic_flux_chunked` + `delta` + `dpfp` + `standard` FFN)
-- **Model Boyutları:** İki model de eşdeğer mimari: hidden=256, layers=4, heads=4, ~16M toplam parametre (3M core + 13M embedding, weight-tied).
-- **Protokol:** 2 LR {5e-4, 1e-3} × 3 seed {0, 1, 2} = 12 koşu. max_iters=5000, eval_interval=200, patience=7, batch_size=16, seq_length=256. TinyShakespeare (~300K token). Her model için en iyi LR, 3-seed ortalamasıyla seçildi.
-
-| Model | LR | Seed 0 | Seed 1 | Seed 2 | Ort. ± Std |
-|---|---|---|---|---|---|
-| GPT-2 | 5e-4 | 5.7196 | 5.6752 | 5.7137 | **5.703 ± 0.024** |
-| GPT-2 | 1e-3 | 5.7968 | 5.7680 | 5.7701 | 5.778 ± 0.016 |
-| HFP | 5e-4 | 5.5484 | 5.5383 | 5.5573 | **5.548 ± 0.010** |
-| HFP | 1e-3 | 5.5968 | ❌ OOM | 5.5396 | 5.568 (2 seed) |
-
-**Nihai karşılaştırma (en iyi LR = 5e-4, 3 seed):**
-
-| Model | Val Loss | PPL | Early Stop |
-|---|---|---|---|
-| GPT-2 | 5.703 ± 0.024 | ~300 | step 1800-2000 |
-| **HFP** | **5.548 ± 0.010** | **~257** | step 2000 |
-| Fark | **−0.155** | **−43 PPL** | |
-
-- **Bulgular:**
-  1. HFP, GPT-2'yi 3 seed'de tutarlı olarak geçiyor. Fark ~6× standart hatadan büyük.
-  2. HFP'nin seed-varyansı GPT-2'den düşük (std 0.010 vs 0.024) — daha kararlı öğrenme.
-  3. İki model de erken durdurma ile step 1800-2000'de durdu (train loss ~2-3 vs val loss ~5.5-5.7, şiddetli overfitting).
-  4. HFP per-step ~6× yavaş (cubic sequential scan + delta + dpfp overhead).
-  5. `hfp_lr0.001_s1` koşusu GPU bellek yetersizliği (OOM) nedeniyle çöktü; en iyi LR (5e-4) 3 seed'de tam.
-- **Sınırlar:** Küçük ölçek (~16M param, ~300K token). Harici baseline (GLA/Mamba) karşılaştırması yapılmadı. Overfitting nedeniyle erken durdurma zorunlu; daha büyük veriyle doğrulama gerekir.
-- **Sonuç:** HFP mimarisinin O(1) bellek ile çalışmasına rağmen, tam dikkat kullanan GPT-2'yi dil modelleme görevinde geçtiği, çok-seed'li ve LR-taramalı titiz bir deneyle doğrulandı. Fark istatistiksel olarak güçlü ancak küçük ölçekte; genelleme için daha büyük veri/model gerekir.
-
 ## Ek 12: Chunkwise delta (TAM paralel form) + streaming-mix (yalnız dev)
 
 **(c) Paralel delta:** u_t okuması "sözde-değer" W'ye dönüştürülünce recurrence
@@ -413,7 +372,49 @@ Sıradaki: streaming-mix seed 1-2 (artık delta hızlı olduğundan ucuz).
 
 ---
 
-### Ek 16: Faz 1b — cubic_flux Uzun-Ufuk Karar Deneyi (DOĞRULANDI ✅)
+## Ek 14: Karar Deneyi (Additive vs Delta) - Streaming Mix
+- **Tarih:** 2026-07-07
+- **Test:** `kaggle_streaming_mix_test.ipynb` (3 Seed, Ctx 160 ve 640)
+- **Mimari:** `cubic_flux_chunked` + `dpfp`
+- **Bulgular:** 3 Seed'in ortalaması alındığında:
+  - **Kısa Bağlam (Ctx 160):** Additive %34.8 güncellenen bilgi tutarken, Delta bu oranı **%52.8**'e çıkardı. (+18% mutlak sıçrama).
+  - **Uzun Bağlam (Ctx 640):** Additive %14.7 güncellenen bilgi tutarken, Delta **%28.6**'ya ulaştı (neredeyse 2 kat performans). Stale (bayat) bilgi oranı ise yarı yarıya azaldı (Ortalama %6.8 -> %3.7).
+  - Delta, Seed 0 ve 2'de muazzam bir fark atarken, en kötü koşusu olan Seed 1'de bile Additive'den daha iyi performans sergiledi.
+- **Karar:** Delta yazım kuralı, özellikle uzun bağlamlarda (ctx=640) bilgiyi güncelleme ve bayat veriyi unutma konusunda Additive kuralına göre **2 kat daha başarılı** olduğunu kanıtlamıştır. Eğitim sırasında 2.2x yavaş olmasına rağmen, cihaz-içi (on-device) çıkarım (inference) hızları ve O(1) bellek tüketimleri birebir aynı olduğu için, kazanılan bu muazzam hafıza kapasitesi yavaşlığa kesinlikle değmektedir. **Faz 2 (Dil Modelleme) için HFP'nin yazım kuralı DELTA olarak belirlenmiştir.** Nihai reçete: `Cubic (Çürüme) + Delta (Yazım) + DPFP (Kapasite)`.
+
+## Ek 15: Faz 2.1 — Gerçek Dil Modelleme Benchmark'ı (TinyShakespeare, çok-seed)
+- **Tarih:** 2026-07-07
+- **Test:** `kaggle_lm_benchmark.ipynb` (2× T4 GPU paralel, 12 koşu)
+- **Karşılaştırma:** GPT-2 (Transformer Baseline) vs HFP (`cubic_flux_chunked` + `delta` + `dpfp` + `standard` FFN)
+- **Model Boyutları:** İki model de eşdeğer mimari: hidden=256, layers=4, heads=4, ~16M toplam parametre (3M core + 13M embedding, weight-tied).
+- **Protokol:** 2 LR {5e-4, 1e-3} × 3 seed {0, 1, 2} = 12 koşu. max_iters=5000, eval_interval=200, patience=7, batch_size=16, seq_length=256. TinyShakespeare (~300K token). Her model için en iyi LR, 3-seed ortalamasıyla seçildi.
+
+| Model | LR | Seed 0 | Seed 1 | Seed 2 | Ort. ± Std |
+|---|---|---|---|---|---|
+| GPT-2 | 5e-4 | 5.7196 | 5.6752 | 5.7137 | **5.703 ± 0.024** |
+| GPT-2 | 1e-3 | 5.7968 | 5.7680 | 5.7701 | 5.778 ± 0.016 |
+| HFP | 5e-4 | 5.5484 | 5.5383 | 5.5573 | **5.548 ± 0.010** |
+| HFP | 1e-3 | 5.5968 | ❌ OOM | 5.5396 | 5.568 (2 seed) |
+
+**Nihai karşılaştırma (en iyi LR = 5e-4, 3 seed):**
+
+| Model | Val Loss | PPL | Early Stop |
+|---|---|---|---|
+| GPT-2 | 5.703 ± 0.024 | ~300 | step 1800-2000 |
+| **HFP** | **5.548 ± 0.010** | **~257** | step 2000 |
+| Fark | **−0.155** | **−43 PPL** | |
+
+- **Bulgular:**
+  1. HFP, GPT-2'yi 3 seed'de tutarlı olarak geçiyor. Fark ~6× standart hatadan büyük.
+  2. HFP'nin seed-varyansı GPT-2'den düşük (std 0.010 vs 0.024) — daha kararlı öğrenme.
+  3. İki model de erken durdurma ile step 1800-2000'de durdu (train loss ~2-3 vs val loss ~5.5-5.7, şiddetli overfitting).
+  4. HFP per-step ~6× yavaş (cubic sequential scan + delta + dpfp overhead).
+  5. `hfp_lr0.001_s1` koşusu GPU bellek yetersizliği (OOM) nedeniyle çöktü; en iyi LR (5e-4) 3 seed'de tam.
+- **Sınırlar:** Küçük ölçek (~16M param, ~300K token). Harici baseline (GLA/Mamba) karşılaştırması yapılmadı. Overfitting nedeniyle erken durdurma zorunlu; daha büyük veriyle doğrulama gerekir.
+- **Sonuç:** HFP mimarisinin O(1) bellek ile çalışmasına rağmen, tam dikkat kullanan GPT-2'yi dil modelleme görevinde geçtiği, çok-seed'li ve LR-taramalı titiz bir deneyle doğrulandı. Fark istatistiksel olarak güçlü ancak küçük ölçekte; genelleme için daha büyük veri/model gerekir.
+
+
+## Ek 16: Faz 1b — cubic_flux Uzun-Ufuk Karar Deneyi (DOĞRULANDI ✅)
 - **Tarih:** 2026-07-07
 - **Test:** `kaggle_cubic_longhorizon.ipynb` → `review_scripts/cubic_longhorizon.py` (P100 GPU, 36 koşu sıralı)
 - **Tasarım:** 4 konfigürasyon {exp, cubic_flux_chunked} × {elu, dpfp}, 3 LR {3e-4, 1e-3, 3e-3}, 3 seed {0,1,2} = 36 koşu. Eğitim ctx=160 (P=8 dense recall, 600 adım, cosine LR schedule), eval ctx=640 ve ctx=1280. Model: 2 katman, hidden=64, local_window=8, write_rule="additive", ffn_type="standard", bulk_dim=32, rec_block=32.
@@ -451,7 +452,7 @@ Sıradaki: streaming-mix seed 1-2 (artık delta hızlı olduğundan ucuz).
 - **Sınırlar:** Mini ölçek (~0.5M param, sentetik recall). Gerçek dil modelleme görevinde cubic+dpfp'nin avantajı henüz test edilmedi (Ek 15'te cubic+delta+dpfp LM'de iyi ama exp+dpfp LM karşılaştırması yapılmadı). Bu test write_rule="additive" ile yapıldı; delta ile tekrarlanmalı.
 - **Güncellenen durum:** cubic_flux_chunked + dpfp, seyrek-uzun-gap rejiminde (ctx≥640, gap≥128) exp+dpfp'ye göre **3× recall avantajı** sağlıyor. Bu, projenin asıl özgün iddiasının ilk deneysel doğrulamasıdır.
 
-### Ek 17: WikiText-2 LM Ablasyonu (3 seed) — bileşen katkıları
+## Ek 17: WikiText-2 LM Ablasyonu (3 seed) — bileşen katkıları
 
 RESULTS.md §10'un Türkçesi. 16M param, seq 256, LR 5e-4, weight_decay 0.1, 3 seed.
 
@@ -469,7 +470,7 @@ RESULTS.md §10'un Türkçesi. 16M param, seq 256, LR 5e-4, weight_decay 0.1, 3 
   deneyini bekliyor (train@256 → eval@2048, >2 SE kriteri) — bkz.
   `docs/internal_tr/SONRAKI_ADIMLAR_PLANI.md`.
 
-### Ek 18: Training-length cliff LM'de de geçerli (3 seed, negatif sonuç)
+## Ek 18: Training-length cliff LM'de de geçerli (3 seed, negatif sonuç)
 
 RESULTS.md §11'in Türkçesi. WikiText-2'de doğrudan seq 1024'te eğitim
 (16M param, LR 5e-4, 2500 iter, batch 8): hem `cubic+additive+dpfp` hem
