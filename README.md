@@ -148,6 +148,34 @@ label alignment, chunk-consistency of both retention modes, and cached
 generation. Note: `cubic_flux` uses a sequential scan (O(L)); it is slower than
 the parallel `exp` path and best run on GPU.
 
+## Grafting onto pretrained LLMs (Phase 3, experimental)
+
+`hfp/models/grafting.py` swaps a subset of a pretrained Llama-family model's
+attention layers for HFP memory modules (per-head state, GQA-aware, RoPE
+bypassed, projections warm-started and frozen), then distills them
+teacher-free: in `teacher_forcing` mode each grafted layer trains its HFP
+branch against the original attention's output inside the same forward pass —
+no second model in memory, so a 1.5B model fits on a single T4.
+
+```python
+from transformers import AutoModelForCausalLM
+from hfp.models.grafting import GraftConfig, graft_llama, set_graft_mode, distill_loss
+
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-1.5B")
+graft_llama(model, GraftConfig(decay_mode="cubic_flux_chunked", write_rule="hybrid"))
+set_graft_mode(model, "teacher_forcing")     # Stage 1: layerwise MSE distillation
+out = model(input_ids); distill_loss(model)  # -> aux loss (or use set_distill_backward)
+set_graft_mode(model, "student")             # inference: O(1) grafted layers
+```
+
+`write_rule="hybrid"` is the **alpha-gate write**: a learnable per-head
+interpolation between additive (archival) and delta (updating) writes,
+`M += β·k(v − α·v_old)ᵀ`, solved chunkwise-parallel. Run
+`review_scripts/graft_smoke.py` first; the full training/validation pipeline
+(zero-shot sanity → Stage 1/2 → needle + constant-VRAM checks) is
+`notebooks/colab_graft_qwen_v2.ipynb`. Results pending — see
+`docs/internal_tr/SONRAKI_ADIMLAR_PLANI.md` for pre-registered criteria.
+
 ## Repository layout
 
 ```
@@ -155,6 +183,7 @@ hfp/core/hfp_bulk_state.py        recurrent memory: M,z state, exp + cubic_flux 
 hfp/core/bulk_trigger_decoder.py  decoder layer: windowed attention + EntangledFFN
 hfp/models/modeling_hfp.py        HuggingFace-compatible model
 hfp/models/configuration_hfp.py   config
+hfp/models/grafting.py            Phase 3: HFP memory grafting onto pretrained LLMs
 run_experiment.py                 retention / recall / lm experiments
 smoke_test.py                     regression tests
 train.py                          standard AdamW training loop

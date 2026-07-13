@@ -107,6 +107,57 @@ An ablation study was conducted on WikiText-2 (16M parameters, seq length 256, 3
 \end{itemize}
 While \code{delta} writes were required to fix \code{dpfp} interference under the exponential baseline, the state-magnitude-dependent decay of \code{cubic\_flux} synergizes optimally with \code{additive} writes and \code{dpfp}, yielding a massive 10.3 PPL reduction over the standard architecture. This validates \textbf{\code{cubic\_flux + additive + dpfp}} as the target recipe for scaling.
 
+\section{External family baseline: Gated Linear Attention}
+% TASLAK — [SONUC:...] alanlari Gorev A/B ciktilariyla doldurulacak.
+To position HFP against the efficient-recurrent family, an equal-parameter
+pure-PyTorch GLA baseline (data-dependent per-channel forget gates, chunkwise
+parallel; Yang et al.\ 2023 family) was trained under the identical WikiText-2
+protocol with a per-mode learning-rate sweep ($\{3\mathrm{e}{-4},
+5\mathrm{e}{-4}, 1\mathrm{e}{-3}\}$, best selected on seed~0, then 3 seeds).
+Best GLA: LR $3\mathrm{e}{-4}$, val loss [SONUC: ort $\pm$ std], PPL [SONUC]
+(seed-0: 5.458, PPL $\approx$ 234). HFP-best (\code{cubic+additive+dpfp},
+PPL 183.6) [SONUC: leads by X PPL / criterion verdict].
+
+\emph{Honest note on baseline construction.} The naive equal-parameter GLA
+diverged at LM scale and required three standard stabilizations (output
+LayerNorm, pre-LN blocks, $1/\sqrt{H}$ logit scaling with tied embeddings)
+before producing valid runs --- indirect evidence that HFP's own
+normalization stack (retrieval LayerNorm, read-out denominator, multi-scale
+decay initialization) is load-bearing. The GLA here is deliberately a plain
+family representative: no windowed attention, elu$+1$ features.
+
+\section{Write-rule decision at long evaluation lengths}
+% TASLAK — K2 karar deneyi (train@256 -> eval@{256,1024,2048}, 3 seed).
+Training directly at long context hits the trainability cliff (see below), so
+the write-rule question (additive vs.\ delta) is decided by evaluating
+seq-256-trained weights at longer lengths. Pre-registered criterion: delta
+must beat additive by $>2$ combined SE at eval length 2048.
+Result: [SONUC: tablo + hukum]. The official recipe is therefore
+[SONUC: recete].
+
+\emph{Negative result, LM trainability cliff.} Direct training at seq 1024
+leaves both write rules at the $\ln|V|$ plateau in all 3 seeds while the same
+models train normally at seq 256 --- the cliff previously documented on
+retention tasks extends to language modeling; train-short $\rightarrow$
+infer-long is mandatory.
+
+\section{Grafting HFP memory onto a pretrained LLM (Phase 3)}
+% TASLAK — K3 validasyon ciktilariyla doldurulacak.
+Half of Qwen2.5-1.5B's attention layers (13/28) were replaced by per-head HFP
+memory modules (GQA-aware K/V expansion, DPFP per head, RoPE bypassed,
+projections warm-started and frozen; $\sim$325K trainable parameters,
+$<0.03\%$ of the model). Writes use a learnable per-head \emph{alpha-gate}
+interpolation between additive and delta,
+$M \mathrel{+}= \beta\, k\,(v - \alpha\, v_{\mathrm{old}})^{\!\top}$,
+solved chunkwise-parallel via a unit-lower-triangular system (verified
+against the sequential recurrence to $\sim$3e-15). Distillation is
+teacher-copy-free: in teacher-forcing mode each grafted layer regresses its
+HFP branch onto the original attention's output within the same forward pass.
+Pre-registered validation: zero-shot PPL sanity [SONUC], short-context
+degradation $\le 1.05\times$ [SONUC], streaming needle at 2K/8K/16K [SONUC],
+constant state size [SONUC]. Exploratory: the learned per-head $\alpha$
+distribution [SONUC: arsiv/calisma-bellegi kutuplasmasi].
+
 \section{Discussion: Status of the cubic\_flux mechanism}
 
 We emphasize the following boundary between established and open questions:

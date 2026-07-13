@@ -450,3 +450,32 @@ Sıradaki: streaming-mix seed 1-2 (artık delta hızlı olduğundan ucuz).
   6. **cubic ~8× yavaş** (per-step). Eğitim maliyeti yüksek ama çıkarım O(1) ve eşit hızda.
 - **Sınırlar:** Mini ölçek (~0.5M param, sentetik recall). Gerçek dil modelleme görevinde cubic+dpfp'nin avantajı henüz test edilmedi (Ek 15'te cubic+delta+dpfp LM'de iyi ama exp+dpfp LM karşılaştırması yapılmadı). Bu test write_rule="additive" ile yapıldı; delta ile tekrarlanmalı.
 - **Güncellenen durum:** cubic_flux_chunked + dpfp, seyrek-uzun-gap rejiminde (ctx≥640, gap≥128) exp+dpfp'ye göre **3× recall avantajı** sağlıyor. Bu, projenin asıl özgün iddiasının ilk deneysel doğrulamasıdır.
+
+### Ek 17: WikiText-2 LM Ablasyonu (3 seed) — bileşen katkıları
+
+RESULTS.md §10'un Türkçesi. 16M param, seq 256, LR 5e-4, weight_decay 0.1, 3 seed.
+
+| konfigürasyon | val loss (ort ± std) | PPL |
+|---|---|---|
+| exp + additive + elu (sade) | 5.2672 ± 0.0099 | 193.9 |
+| exp + additive + dpfp | 5.2814 ± 0.0101 | 196.6 |
+| exp + delta + dpfp | 5.2660 ± 0.0047 | 193.6 |
+| cubic + delta + dpfp | 5.2534 ± 0.0248 | 191.2 |
+| **cubic + additive + dpfp** | **5.2127 ± 0.0035** | **183.6** |
+
+- DPFP tek başına LM'de zarar (kapasite girişimi); delta bu girişimi çözüyor;
+  cubic, additive+dpfp ile sinerjik büyük kazanç (−10.3 PPL, en düşük varyans).
+- **Reçete notu:** yazım kuralı kararı (additive vs delta) önceden-kayıtlı K2
+  deneyini bekliyor (train@256 → eval@2048, >2 SE kriteri) — bkz.
+  `docs/internal_tr/SONRAKI_ADIMLAR_PLANI.md`.
+
+### Ek 18: Training-length cliff LM'de de geçerli (3 seed, negatif sonuç)
+
+RESULTS.md §11'in Türkçesi. WikiText-2'de doğrudan seq 1024'te eğitim
+(16M param, LR 5e-4, 2500 iter, batch 8): hem `cubic+additive+dpfp` hem
+`cubic+delta+dpfp`, 3 seed'in 3'ünde de `ln|V|` platosunda kaldı
+(val loss 10.85 ≈ ln 50257) — hiç öğrenme yok; aynı modeller seq 256'da
+sorunsuz öğreniyor. Ek 13'teki eğitilebilirlik bulgusunu dil modellemeye
+genişletir: **kısa eğit → uzun koş (train-short → infer-long) LM için de
+zorunludur**; uzun-bağlam kıyasları uzunlukta eğiterek değil, kısa eğitilmiş
+ağırlıkları uzun değerlendirerek yapılmalıdır.
