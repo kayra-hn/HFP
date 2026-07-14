@@ -6,8 +6,8 @@ gizli hataları açıkça söyle. "Fizik ilhamı" retoriğini yok say — yalnı
 gerçekten ne olduğuna ve ampirik olarak neyin kanıtlandığına bak. Her iddia için:
 (a) kodda karşılığı doğru mu, (b) testi geçiyor mu, (c) iddia sonuçla örtüşüyor mu.
 
-Repo kökü: `hfp_arch/`. Torch + transformers gerektirir. `python smoke_test.py`
-her şeyden önce çalışmalı.
+Repo kökü: `HFP_Project/` (paket `hfp/` altında). Torch + transformers
+gerektirir. `python smoke_test.py` her şeyden önce çalışmalı.
 
 ---
 

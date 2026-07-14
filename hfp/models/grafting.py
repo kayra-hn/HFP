@@ -79,8 +79,7 @@ Not: transformers >= 4.46 hedeflenir (attention forward'i (out, weights)
 dondurur). Eski surumlerde GraftConfig.ret_len=3 ayarlayin.
 """
 
-import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional
 
 import torch

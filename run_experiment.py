@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-run_experiment.py - hfp_arch icin durust, kucuk-olcekli yetenek deneyi.
+run_experiment.py - HFP icin durust, kucuk-olcekli yetenek deneyi.
 
 Iki gorev:
   --task recall : Sentetik associative-recall (MQAR). O(1) bellegin bilgiyi uzun
@@ -42,10 +42,9 @@ attention'i olcuyordu. Simdi:
       reset   : chunked ama her chunk'ta state SIFIRLANIR (ablasyon kontrolu;
                 sans seviyesine dusmeli - dusmuyorsa test bellegi olcmuyordur)
 """
-import argparse, math, os, random
+import argparse, math, random
 import numpy as np
 import torch
-import torch.nn as nn
 from transformers import get_cosine_schedule_with_warmup
 from hfp.models.configuration_hfp import HFPConfig
 from hfp.models.modeling_hfp import HFPForCausalLM

@@ -19,7 +19,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 from .hfp_config import config as hfp_config
-from .hfp_utils import compute_curvature, compute_entropy_map, magnitude_defect_flag, coherence_score, conservation_check, holographic_information_bound
+from .hfp_utils import compute_curvature, magnitude_defect_flag, coherence_score, conservation_check, holographic_information_bound
 from .hfp_bulk_state import HFPBulkState
 
 class HFPLinear(nn.Module):

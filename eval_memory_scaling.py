@@ -15,7 +15,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import torch
-import gc
 import matplotlib.pyplot as plt
 import numpy as np
 import multiprocessing as mp

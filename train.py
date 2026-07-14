@@ -15,7 +15,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import torch
-import torch.nn as nn
 from transformers import AutoTokenizer, GPT2LMHeadModel, GPT2Config
 from transformers import get_cosine_schedule_with_warmup
 from hfp.models.configuration_hfp import HFPConfig

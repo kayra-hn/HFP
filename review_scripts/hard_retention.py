@@ -26,7 +26,7 @@ import os
 CKDIR = os.environ.get("HFP_CKPT_DIR", "checkpoints")
 os.makedirs(CKDIR, exist_ok=True)
 
-import math, os, random, sys, time
+import os, random, sys, time
 import numpy as np, torch
 import torch.nn.functional as Fn
 from hfp.models.configuration_hfp import HFPConfig

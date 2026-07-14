@@ -14,7 +14,7 @@ Makaleler (fizik çekirdeği — ANA FİKİR bunlarda):
   (kuantum mekaniğinin geometrik yorumu; çökme = modül seçimi; Born ağırlığı Haar ölçüsünden)
 
 Kod (temiz sürüm — burada çalış):
-- C:\Users\yilma\Documents\HFP_Project\hfp_arch\
+- C:\Users\yilma\Documents\HFP_Project\  (paket doğrudan `hfp/` altında; komutlar repo kökünden)
   - hfp/core/hfp_bulk_state.py      (lineer-attention O(1) matris belleği: M, z + decay + ring buffer)
   - hfp/core/bulk_trigger_decoder.py(decoder katmanı, EntangledFFN/EntangledLinear, TunnelingDropout)
   - hfp/core/physics_optimizers.py  (opsiyonel termodinamik optimizer — lineer relaksasyon)
@@ -23,7 +23,7 @@ Kod (temiz sürüm — burada çalış):
   - train.py, run_experiment.py (MQAR + LM deneyleri), eval_*.py
   - DEGISIKLIKLER.md (yapılan düzeltmelerin kaydı), NASIL_CALISTIRILIR.md
 
-Eski/orijinal sürüm (karşılaştırma için, DEĞİŞTİRME): C:\Users\yilma\Documents\HFP_Project\
+Eski/orijinal referans kod (karşılaştırma için, DEĞİŞTİRME): C:\Users\yilma\Documents\HFP_Project\_legacy_reference\
 
 ## Bağlam (kısa)
 

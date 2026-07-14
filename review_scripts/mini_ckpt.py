@@ -17,7 +17,7 @@
 # Checkpoint'li mini deney kosucusu: her cagri ~BUDGET sn calisir, state kaydeder.
 # Kullanim: python3 mini_ckpt.py <run_id>
 #   run_id: mqar_ck3 | mqar_ck1 | ret_exp | ret_cubic
-import math, random, sys, time, os
+import random, sys, time, os
 import numpy as np, torch
 from hfp.models.configuration_hfp import HFPConfig
 from hfp.models.modeling_hfp import HFPForCausalLM

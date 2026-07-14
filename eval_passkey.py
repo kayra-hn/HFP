@@ -18,7 +18,6 @@ import torch
 import os
 import random
 import matplotlib.pyplot as plt
-import numpy as np
 from transformers import AutoTokenizer
 from hfp.models.configuration_hfp import HFPConfig
 from hfp.models.modeling_hfp import HFPForCausalLM

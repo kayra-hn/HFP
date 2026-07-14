@@ -31,7 +31,6 @@ smoke_test.py - CPU'da ~1 dk. Kritik regresyon testleri:
 Calistirma:  python smoke_test.py
 """
 import torch
-import torch.nn as nn
 
 from hfp.models.configuration_hfp import HFPConfig
 from hfp.models.modeling_hfp import HFPForCausalLM

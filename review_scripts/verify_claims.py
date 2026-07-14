@@ -14,8 +14,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# Bagimsiz reviewer dogrulama scripti (torch). hfp_arch kokunden calistirilir.
-import math, torch, torch.nn.functional as F
+# Bagimsiz reviewer dogrulama scripti (torch). Repo kokunden calistirilir:
+#   python review_scripts/verify_claims.py
+# Bu dosya review_scripts/ altinda oldugu icin Python sys.path[0]'a bu klasoru
+# ekler; repo kokunu de yola eklemezsek "import hfp" basarisiz olur. Asagidaki
+# bootstrap, calistirma dizininden bagimsiz olarak repo kokunu yola koyar.
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import math, torch
 torch.manual_seed(0)
 from hfp.core.hfp_bulk_state import HFPBulkState
 from hfp.models.configuration_hfp import HFPConfig

@@ -1,11 +1,11 @@
-# hfp_arch — Deney Çalıştırma Kılavuzu
+# HFP — Deney Çalıştırma Kılavuzu
 
-Kod bu ortamda çalıştırılamadı (torch kurulamıyor). Aşağıdakiler senin makinende
-çalışacak tam komutlar ve beklenen çıktılardır.
+Aşağıdakiler senin makinende çalışacak tam komutlar ve beklenen çıktılardır.
+Tüm komutlar **repo kökünden** (`HFP_Project/`) çalıştırılır.
 
 ## 0. Kurulum + İLK İŞ: smoke test
 ```bash
-cd HFP_Project/hfp_arch
+cd HFP_Project
 pip install torch transformers numpy matplotlib
 python smoke_test.py        # CPU, ~1 dk
 ```

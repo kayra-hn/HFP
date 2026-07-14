@@ -31,7 +31,7 @@ Kullanim (Colab'de Stage 1 sonrasi ya da lokalde):
     python review_scripts/alpha_gate_analysis.py /path/to/hfp_graft_final.pt
 """
 
-import os, sys, math
+import os, sys
 if '__file__' in globals():   # script olarak; notebook hucresine yapistirilirsa atlanir
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
