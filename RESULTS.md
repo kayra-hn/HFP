@@ -91,7 +91,7 @@ values mislabeled, see §14):
 - GPT-2 (Transformer baseline): Val Loss 5.703 (PPL ~300)
 - **HFP** (`cubic_flux` + `delta` + `dpfp`): **Val Loss 5.548 (PPL ~257)**
 
-HFP outperforms the full-attention baseline, confirming the O(1) recurrent architecture is viable for text modeling. An ablation study is underway to isolate the specific contribution of each component to this LM advantage.
+HFP ranked ahead of the full-attention baseline under this shared historical objective. Because the objective was later identified as skip-one rather than next-token (§14), this is a useful viability signal and ranking record, not a final next-token/O(1) LM claim.
 
 ## 8. Current recipe
 
@@ -125,7 +125,7 @@ A definitive multi-seed (seeds 0, 1, 2) ablation was conducted on the WikiText-2
 * `exp + additive + dpfp`: PPL **196.6** (+2.7 PPL, capacity interference)
 * `exp + delta + dpfp`: PPL **193.6** (-3.0 PPL vs dpfp, delta fixes interference)
 * `cubic_flux + delta + dpfp`: PPL **191.2** (-2.4 PPL vs exp)
-* **`cubic_flux + additive + dpfp`**: PPL **183.6** (Massive -10.3 PPL vs baseline)
+* **`cubic_flux + additive + dpfp`**: PPL-label **183.6** (best value in this shared skip-one-objective table; see metric note above)
 
 **Component Analysis:**
 1. **DPFP Effect (alone):** In the standard exponential additive setup, DPFP degrades LM performance (193.9 -> 196.6) due to capacity overlap/interference in dense text.
@@ -133,7 +133,7 @@ A definitive multi-seed (seeds 0, 1, 2) ablation was conducted on the WikiText-2
 3. **Cubic Effect:** The `cubic_flux` retention law creates a massive synergistic win when paired with `additive + dpfp`, dropping PPL to 183.6. It also improves the `delta + dpfp` setup (193.6 -> 191.2).
 
 **Conclusion:**
-The architecture combination of **`cubic_flux + additive + dpfp`** is strictly superior to all other variants, providing a 10.3 PPL reduction over the standard linear attention baseline. This is the established target recipe for future scaling.
+The architecture combination of **`cubic_flux + additive + dpfp`** is the best variant in this controlled shared-objective table. Because the absolute values are skip-one scores rather than next-token PPL (§14), use the table for component ranking only; do not cite the numbers as final language-model perplexities.
 
 ## 11. Training-length cliff applies to LM as well (3 seeds, negative result)
 

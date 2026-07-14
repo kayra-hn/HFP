@@ -25,7 +25,7 @@ from ..core.hfp_bulk_state import HFPBulkState
 from ..core.bulk_trigger_decoder import BulkTriggerDecoderLayer
 
 class SinusoidalPositionalEncoding(nn.Module):
-    def __init__(self, hidden_size, max_len=5000, pe_scale=0.3):
+    def __init__(self, hidden_size, max_len=5000, pe_scale=0.3, pe_period=None):
         super().__init__()
         self.max_len = max_len
         # [FIX K7] PE olcegi. Onceden ham (norm=sqrt(d/2)=8) eklenirken embedding
@@ -34,6 +34,7 @@ class SinusoidalPositionalEncoding(nn.Module):
         # (MQAR loss ln(val_space)'te sabitlenip binding hic ogrenilmiyordu).
         # embed *sqrt(d) (bkz. HFPModel) + PE *0.3 ile normlar dengelenir.
         self.pe_scale = pe_scale
+        self.pe_period = pe_period
         pe = torch.zeros(max_len, hidden_size)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, hidden_size, 2).float() * (-math.log(10000.0) / hidden_size))
@@ -43,7 +44,15 @@ class SinusoidalPositionalEncoding(nn.Module):
 
     def forward(self, x, offset: int = 0):
         # [FIX A2] Streaming/chunked prefill'de her chunk'a 0..L degil, GLOBAL pozisyon eklenir.
+        # [LEN-STABLE] pe_period default None oldugu icin eski mutlak-pozisyon davranisi korunur.
+        # Pozitif period, train-short -> infer-long deploy/probe icin PE'yi modulo doser.
         seq_len = x.size(1)
+        if self.pe_period is not None:
+            period = int(self.pe_period)
+            if period <= 0 or period > self.max_len:
+                raise ValueError(f"pe_period must be in [1, {self.max_len}], got {self.pe_period}")
+            positions = (torch.arange(offset, offset + seq_len, device=x.device) % period).long()
+            return x + self.pe_scale * self.pe[:, positions, :].to(x.device)
         if offset + seq_len > self.max_len:
             offset = max(0, self.max_len - seq_len)
         return x + self.pe_scale * self.pe[:, offset:offset + seq_len, :].to(x.device)
@@ -79,7 +88,8 @@ class HFPModel(HFPPreTrainedModel):
         self.embed_scale = math.sqrt(config.hidden_size)
         self.pos_encoder = SinusoidalPositionalEncoding(
             config.hidden_size, max_len=config.max_position_embeddings,
-            pe_scale=getattr(config, "pe_scale", 0.3))
+            pe_scale=getattr(config, "pe_scale", 0.3),
+            pe_period=getattr(config, "pe_period", None))
 
         self.layers = nn.ModuleList([
             BulkTriggerDecoderLayer(

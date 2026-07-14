@@ -36,6 +36,9 @@ class HFPConfig(PretrainedConfig):
                                         #   (bellek testleri icin sart: aksi halde attention tum baglami gorur)
         pe_scale=0.3,                   # [FIX K7] pozisyonel kodlama olcegi; ham PE (1.0) token
                                         #   icerigini ~35x boguyordu -> recall imkansizdi. 0.3 = dengeli.
+        pe_period=None,                 # [LEN-STABLE] None=mutlak pozisyon (eski davranis). Pozitif int ise
+                                        #   PE pozisyonlari modulo period dosenir; train-short -> infer-long
+                                        #   deploy icin opsiyonel, default kapali.
         rec_block=64,                   # [K2] chunk-ici recurrence blok boyutu (hiz/bellek; sonucu degistirmez)
         decay_mode="exp",               # [HFP-CORE] "exp"=geometrik decay baseline; "cubic_flux"=
                                         #   makalenin dth/dtau=-eta*th^3 kubik-plato retention'i (ayirt edici);
@@ -71,6 +74,7 @@ class HFPConfig(PretrainedConfig):
         self.max_short_len = max_short_len
         self.local_window = local_window
         self.pe_scale = pe_scale
+        self.pe_period = pe_period
         self.rec_block = rec_block
         self.decay_mode = decay_mode
         self.conv_kernel = conv_kernel

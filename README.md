@@ -103,9 +103,7 @@ Headline findings (small scale, synthetic recall; patterns are seed-robust):
   `dpfp` features + `ffn_type="standard"` (WikiText-2 ablation, RESULTS §10; write
   rule locked by the pre-registered K2 experiment, RESULTS §13).
 - **`cubic_flux` long-horizon win**: In sparse, long-gap regimes (gap ≥ 256), `cubic_flux_chunked` paired with DPFP outperforms the exponential baseline significantly (3x recall advantage), validating the core long-horizon hypothesis.
-- **Language Modeling**: HFP outperforms GPT-2 (Transformer baseline) on
-  TinyShakespeare (PPL ~257 vs ~300, 3 seeds), proving the viability of the O(1)
-  recurrent state for text modeling.
+- **Language Modeling**: HFP showed a favorable small-scale TinyShakespeare ranking against a GPT-2-style baseline under the same historical skip-one objective (PPL labels are under revision; see RESULTS §14). This is evidence for LM viability, not a final next-token/O(1) headline claim.
 - **GLA family comparison — under revision (honest note)**: a metric artifact
   (double-shifted labels; RESULTS §14) made the published HFP-vs-GLA numbers
   non-comparable. A corrected single-seed probe reaches next-token PPL 55.4

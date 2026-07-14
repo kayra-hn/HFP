@@ -150,6 +150,23 @@ with torch.no_grad():
     d = (r_mod - r_naive).abs().max().item()
 check("exp chunkwise == naive recurrence", d < 1e-5, f"max|diff|={d:.2e}")
 
+# --- G. Opsiyonel modulo PE: default kapali, acilinca periodik pozisyonlar esit
+torch.manual_seed(7)
+cfg_abs = HFPConfig(vocab_size=32, hidden_size=16, num_hidden_layers=1, num_attention_heads=2,
+                    intermediate_size=32, bulk_dim=8, max_position_embeddings=64)
+cfg_default = HFPConfig(vocab_size=32, hidden_size=16, num_hidden_layers=1, num_attention_heads=2,
+                        intermediate_size=32, bulk_dim=8, max_position_embeddings=64, pe_period=None)
+check("pe_period default kapali", cfg_abs.pe_period is None and cfg_default.pe_period is None)
+model_pe = HFPForCausalLM(HFPConfig(vocab_size=32, hidden_size=16, num_hidden_layers=1,
+                                   num_attention_heads=2, intermediate_size=32, bulk_dim=8,
+                                   max_position_embeddings=64, pe_period=16)).hfp.pos_encoder
+with torch.no_grad():
+    z0 = torch.zeros(1, 4, 16)
+    p0 = model_pe(z0, offset=0)
+    p16 = model_pe(z0, offset=16)
+    dpe = (p0 - p16).abs().max().item()
+check("pe_period modulo pozisyonlari esler", dpe == 0.0, f"max|diff|={dpe:.2e}")
+
 print()
 print(f"TOPLAM: {sum(ok for _, ok, _ in R)}/{len(R)} PASS")
 for n, ok, det in R:
