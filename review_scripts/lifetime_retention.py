@@ -14,7 +14,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""[GOREV C / OMUR TESTI] Cihaz-ici uzun-omurlu ajan rejimi: seyrek olgu,
+"""[GOREV C v2 / OMUR TESTI]  (v1 GECERSIZDI: tek-denetimli egitim §1 geregi
+ln(30) platosunda kaldi — 5/6 kol hic ogrenmedi; v2 egitimi dense_retention
+tarzi YOGUN denetime cevirdi. Eval (streaming omur sondasi) degismedi.)
+
+[GOREV C / OMUR TESTI] Cihaz-ici uzun-omurlu ajan rejimi: seyrek olgu,
 yogun trafik, egitim ufkunun COK otesinde geri getirme.
 
 MOTIVASYON (on-kayit, 2026-07-19): §15h graft kiyasinda cubic'in avantaji
@@ -75,7 +79,7 @@ DIST_EVERY = int(os.environ.get("LT_DIST_EVERY", "64"))
 KLO, KHI, VLO, VHI, FHI = 100, 130, 130, 160, 100   # sans = 1/30
 CTX, WIN, MAXGAP, NDIS = 320, 8, 256, 6
 ANS = 0
-TAG = f"lifetime_{MODE}_s{SEED}"
+TAG = f"lifetimev2_{MODE}_s{SEED}"
 CKPT = f"{CKDIR}/{TAG}.pt"
 
 random.seed(SEED); np.random.seed(SEED); torch.manual_seed(SEED)
@@ -89,27 +93,29 @@ model = HFPForCausalLM(cfg)
 DEV = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(DEV)
 
-# ---------------- EGITIM (hard_retention protokolu) ----------------
-def make_train_seq(gap):
+# ---------------- EGITIM (dense_retention protokolu — §1: YOGUN denetim sart) ----------------
+P = 8   # dizide 8 olgu + 8 sorgu (tek-denetim ctx>300'de OGRENMIYOR; RESULTS §1)
+def make_train_seq():
     toks = [random.randint(1, FHI - 1) for _ in range(CTX)]
-    keys = random.sample(range(KLO, KHI), NDIS + 1)
-    tgt_k = keys[0]
-    for i, k in enumerate(keys[1:]):
-        toks[2 * i] = k
-        toks[2 * i + 1] = random.randint(VLO, VHI - 1)
-    vpos = CTX - 2 - gap; kpos = vpos - 1
-    assert kpos >= 2 * NDIS
-    v = random.randint(VLO, VHI - 1)
-    toks[kpos] = tgt_k; toks[vpos] = v
-    toks[CTX - 2] = tgt_k; toks[CTX - 1] = ANS
-    return toks, v
+    nslot = CTX // 2
+    slots = random.sample(range(nslot), 2 * P)
+    random.shuffle(slots)
+    keys = random.sample(range(KLO, KHI), P)
+    lab = [-100] * CTX
+    for i in range(P):
+        a, b = slots[2 * i], slots[2 * i + 1]
+        if a > b: a, b = b, a
+        wp, qp = 2 * a, 2 * b
+        v = random.randint(VLO, VHI - 1)
+        toks[wp] = keys[i]; toks[wp + 1] = v
+        toks[qp] = keys[i]; toks[qp + 1] = ANS
+        lab[qp + 1] = v
+    return toks, lab
 
 def batch(bs=16):
     seqs, labels = [], []
     for _ in range(bs):
-        g = random.randint(1, MAXGAP)
-        toks, v = make_train_seq(g)
-        lab = [-100] * CTX; lab[-1] = v
+        toks, lab = make_train_seq()
         seqs.append(toks); labels.append(lab)
     return torch.tensor(seqs, device=DEV), torch.tensor(labels, device=DEV)
 
@@ -170,6 +176,12 @@ def probe(gap):
     lp = Fn.log_softmax(logits, -1)[v].item()
     return ok, lp
 
+# [PLATO KORUMASI] Egitim sans-platosunda kaldiysa kiyas GECERSIZ (v1 dersi).
+with torch.no_grad():
+    _x, _y = batch(bs=32)
+    _l = model(_x, labels=_y).loss.item()
+print(f"[{TAG}] egitim-sonu dogrulama loss: {_l:.3f} (sans ~3.40)")
+assert _l < 2.5, (f"OGRENMEDI: loss {_l:.2f} ~ sans platosu; kiyas gecersiz. (RESULTS §1)")
 model.eval()
 rows = []; res = {}
 for g in GAPS:
@@ -186,6 +198,6 @@ for g in GAPS:
 print(f"[{TAG}] FINAL acc%/logprob (sans %3.3): {res}")
 with open(f"{CKDIR}/lifetime_results.txt", "a") as f:
     f.write(f"{TAG} {res}\n")
-with open(f"{CKDIR}/lifetime_{TAG}.csv", "w", newline="") as f:
+with open(f"{CKDIR}/{TAG}.csv", "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=list(rows[0].keys())); w.writeheader(); w.writerows(rows)
 print(f"[{TAG}] yazildi: {CKDIR}/lifetime_results.txt + lifetime_{TAG}.csv")
