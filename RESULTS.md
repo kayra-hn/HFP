@@ -526,6 +526,38 @@ extended to the lifetime regime, and it predicts the fix is **capacity**
 capacity account is confirmed and the lifetime claim becomes a
 *write-sparsity* claim rather than a retention-law claim.
 
+## 18. Görev D — write-sparsity sweep: the capacity account is REJECTED
+
+Pre-registered follow-up to §17 (`notebooks/kaggle_write_sparsity_sweep.ipynb`).
+Gap fixed at 16384; only the interference rate varies. Seed-mean accuracy
+(chance 3.3%, n=30/cell/seed, §17 v2 checkpoints, eval-only):
+
+| write interval | ~competing writes | exp | cubic_flux |
+|---|---|---|---|
+| every 64 tok | 256 | 6.7% (3-10) | 7.8% (7-10) |
+| every 256 tok | 64 | 3.3% (0-7) | 2.2% (0-7) |
+| every 1024 tok | 16 | 2.2% (0-3) | 3.3% (3-3) |
+| every 4096 tok | 4 | 2.2% (0-7) | 8.9% (0-27) |
+
+**Verdict: the capacity/interference explanation for §17 is rejected.**
+Thinning writes 64× (256 → 4 competitors) produced **no recovery** — sparsest
+minus densest is +1.1 pts, and the trend is if anything *downward*. So §17's
+collapse beyond 1024 is **not** state saturation; per the pre-registered second
+reading it is a **failure to generalize past the training horizon** (256): the
+model retains at the horizon it was trained on (§17: 15.6-18.9%, 4.7-5.7×
+chance) and cannot transfer that skill to distances it never saw, in an
+otherwise near-empty state. Consequence for the on-device thesis: the fix is
+neither the retention law (§15h, §17) nor capacity (§18) — it is **training
+horizon / curriculum**. This mirrors the graft line, where retrieval at 8-16k
+appeared only after a *distance curriculum* was added (§15f); the small-scale
+model here never got one. Next test (cheap, same harness): raise the training
+carry range (CTX/MAXGAP, or a chunked curriculum with carries up to ~4k) and
+re-run the §17 gap curve; if far-gap accuracy then rises, the account is
+confirmed and the deployable claim becomes *"O(1) memory retains at distances
+it was trained to carry"* — an honest, testable, and useful statement.
+Logged anomaly (single seed, not a claim): cubic s2 at the sparsest setting
+hit 26.7% (8/30) while its sibling seeds scored 0.0%.
+
 ## Reproduction
 
 ```bash
