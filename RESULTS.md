@@ -480,6 +480,24 @@ PPL**, HFP-del ~225, GLA ~226 — HFP-add still leads, the delta arm's margin
 vanishes, and GLA's best seed (197.8) crosses below the HFP-add mean
 (single-seed crossover under high GLA variance ±0.053; not averaged away).
 
+## 17. Görev C — lifetime retention (cubic's natural-habitat test)
+
+**v1 (2026-07-20): INVALID — and an independent replication of §1.** The first
+version trained with single-token supervision at ctx 320; 5/6 arms never left
+the ln(30) chance plateau (train loss ≈3.42 for 800 steps), so the law
+comparison never happened (same-seed exp/cubic arms even produced identical
+chance-level evals — an unlearned model's outputs barely depend on the decay
+mode). This is §1's supervision-density finding reproduced in fresh code. The
+one escaping arm (cubic s1, loss→0.23) evaluated *worse* in logprob
+(−4.1..−4.8): memorization, not retention. **v2** switches training to dense
+supervision (8 facts+queries per sequence, `dense_retention` protocol), keeps
+the streaming lifetime probe unchanged, and adds a post-training plateau guard
+(abort if val-batch loss ≥2.5) so an unlearned model can never again
+masquerade as a comparison. Pre-registered criteria unchanged (script
+docstring). v2 results pending.
+
+## Reproduction
+
 ```bash
 python smoke_test.py
 python review_scripts/verify_claims.py
