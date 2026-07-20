@@ -494,7 +494,37 @@ supervision (8 facts+queries per sequence, `dense_retention` protocol), keeps
 the streaming lifetime probe unchanged, and adds a post-training plateau guard
 (abort if val-batch loss ≥2.5) so an unlearned model can never again
 masquerade as a comparison. Pre-registered criteria unchanged (script
-docstring). v2 results pending.
+docstring).
+
+**v2 result (2026-07-20): the pre-registered third outcome — neither law holds
+this regime.** Training now learns (loss 3.4 → 1.41-2.20; plateau guard
+passed on all 6 arms). Seed-mean accuracy (chance 3.3%, n=30/cell/seed):
+
+| carry gap | exp | cubic_flux |
+|---|---|---|
+| 256 (= training horizon) | **15.6%** | **18.9%** |
+| 1024 | 4.4 | 2.2 |
+| 4096 | 1.1 | 2.2 |
+| 16384 | 5.6 | 2.2 |
+| 65536 | 1.1 | 2.2 |
+
+Above 1024 both modes sit at chance; every between-mode difference is ≤1 hit
+(3.3 pts) and the pre-registered threshold (≥+10 pts across two consecutive
+far gaps) is nowhere approached, in either direction. **Verdict: cubic's
+"natural habitat" hypothesis is not supported — but neither is exp; the test
+could not discriminate because both collapse.** The informative signal is
+elsewhere: retention is real *at* the training horizon (256: 4.7-5.7× chance)
+and vanishes beyond it. Since §3 showed train-short→infer-long *does* work
+when fact density falls with length, the difference here is that traffic
+density is held constant (a distractor kv every 64 tokens), so interference
+grows linearly with distance — ~1000 competing writes by 65k into a 32-dim
+state. This is §4's "interference-limited, not decay-limited" diagnosis
+extended to the lifetime regime, and it predicts the fix is **capacity**
+(dpfp ν, bulk_dim, write sparsity/gating), not the retention law. Follow-up
+(cheap, same harness): sweep interference rate `LT_DIST_EVERY` ∈ {64, 512,
+4096} at fixed gap — if far-gap accuracy recovers as writes thin out, the
+capacity account is confirmed and the lifetime claim becomes a
+*write-sparsity* claim rather than a retention-law claim.
 
 ## Reproduction
 
