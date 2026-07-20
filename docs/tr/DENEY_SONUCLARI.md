@@ -563,3 +563,44 @@ ağırlıkları uzun değerlendirerek yapılmalıdır.
 - **Pratik sonuç:** kısa-eğit/tam-attention → eval'de pencere + PE döşemesi
   = sıfır-eğitim maliyetli, uzunluk-kararlı ve çıkarımda O(1) dağıtım modu.
 - **Etiket:** tek seed; teşhis koşusu, manşet iddiası değil.
+
+
+## Ek 22: `pe_period` (modulo PE) — opsiyonel özellik + çok-seed ön ölçüm
+
+- **Tarih:** 2026-07-14
+- **Bağlam:** Ek 21'in E2 satırı ("window + PE mod-256 döşeme", tek-seed) uzunluk
+  degradasyonunun büyük kısmını kapatıyordu. O bulgu, `configuration_hfp.py` +
+  `modeling_hfp.py`'ye kalıcı, **default kapalı** bir `pe_period` bayrağı olarak
+  kodlandı (`None` = eski mutlak-pozisyon davranışı; pozitif int = PE pozisyonları
+  modulo `period` döşenir). `review_scripts/verify_claims.py` iki değişmezi
+  mühürlüyor: (a) `pe_period=None` iken davranış birebir aynı, (b) `offset 0` ile
+  `offset=period` aynı PE'yi üretir (modulo doğruluğu). `smoke_test` + `verify_claims`
+  17/17 yeşil.
+- **Bu Ek'in ölçümü (ayrı, kontrollü A/B):** tek model MQAR-benzeri saf-bellek
+  görevinde `train_ctx=160`'ta eğitildi (2 katman, hidden 64, `local_window=8`,
+  `decay_mode=exp`, additive/elu, 600 adım). **AYNI ağırlıklar** iki çıkarım kolunda
+  değerlendirildi — tek değişken PE davranışı; eval verisi seed başına birebir aynı.
+  3 seed (0,1,2), 50 dizi/uzunluk.
+
+| eval ctx | OFF (mutlak PE) | ON (modulo 160) | delta |
+|---|---|---|---|
+| 160 (= eğitim uzunluğu) | %25.4 | %25.4 | **0.0** |
+| 320 (2×) | %25.8 | %26.9 | +1.2 |
+| 640 (4×) | %25.4 | %27.8 | +2.4 |
+
+- **Bulgu:** Eğitim uzunluğunda (160) delta tam **0.0** → özellik on-distribution
+  davranışı bozmuyor (default-kapalı garantisiyle tutarlı). Eğitim uzunluğunun
+  ötesinde tutarlı **pozitif** ve uzunlukla büyüyor (+1.2 → +2.4). Yön Ek 21 E2 ile
+  aynı: modulo PE, train-short → infer-long dağıtım kaymasını hafifletiyor.
+- **Dürüst sınırlar (manşet DEĞİL):** Fark küçük ve seed-varyansına yakın (seed başı
+  std ~2-3 puan; delta ~1-2 puan). 3 seed ile bu **istatistiksel olarak kesin değil**,
+  yalnızca yönü Ek 21 ile uyumlu bir **ön-bulgu**. Recall tabanı bu mini probta düşük
+  (~%25); trend gerçek olabilir ama zemin zayıf. "Kanıtlandı" DENMEZ.
+- **Karar:** Özellik ucuz, güvenli ve zaten opsiyonel → koddan çıkarılmıyor. Ancak
+  yalnızca **opsiyonel, deploy/probe-zamanı uzunluk-kararlılık modu** olarak sunulur;
+  varsayılan açılmaz, manşet metriklere karıştırılmaz. Kesinleştirmek için: LM
+  ölçeğinde çok-seed (≥5), pencereli O(1) HFP LM koşusunda `pe_period` açık/kapalı
+  next-token PPL @{256,1024,2048} (Ek 20 protokolü + Ek 21 M1 düzeltmesi).
+- **Tekrar üretim:** kontrollü A/B probu tek model eğitip aynı ağırlığı iki PE kolunda
+  değerlendirir (`build(..., pe_period=None)` vs `build(..., pe_period=160)`); eval
+  seed'i sabit tutulur (bilgi yalnızca bellekten aksın diye `local_window=8`).

@@ -1,0 +1,7 @@
+# HFP core dependencies (Python 3.10 hedeflenir; bkz. AGENTS.md)
+# CPU-only torch icin: pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.1
+transformers>=4.40
+numpy>=1.24
+matplotlib>=3.7
+huggingface_hub>=0.23

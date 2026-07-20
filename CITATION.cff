@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "HFP — Hyper-Flux Projection: O(1) recurrent memory with a cubic-plateau retention law"
+authors:
+  - family-names: "Yılmaz"
+    given-names: "Kayrahan"
+version: "2.1.0"
+date-released: "2026-07-18"
+license: "AGPL-3.0-only"
+repository-code: "https://github.com/kayra-hn/HFP"
+keywords:
+  - linear attention
+  - long context
+  - O(1) memory
+  - retention law

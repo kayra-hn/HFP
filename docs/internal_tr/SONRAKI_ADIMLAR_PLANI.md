@@ -32,7 +32,7 @@
 |---|---|---|---|
 | Görev A: GLA baseline (seq 256, LR taraması + 3 seed) | Kaggle (arka plan) | `kaggle_gla_lm_benchmark_v2.ipynb` | ~2-3 saat |
 | Görev B: delta-vs-additive, train@256 → eval@{256,1024,2048} | Kaggle (aynı notebook) | 〃 | ~4-6 saat |
-| Grafting Stage 1+2 + validasyon | Colab (T4) | `colab_graft_qwen_v2.ipynb` | ~5-8 saat |
+| Grafting Stage 1+2 + validasyon | Colab (T4) | `colab_graft_qwen_v3_kaggle.ipynb` | ~5-8 saat |
 
 **Tamamlanmış ve geçerli:**
 - WikiText-2 ablasyonu (3 seed): `cubic+additive+dpfp` PPL 183.6 (en iyi, en düşük varyans).
@@ -126,7 +126,7 @@ Sıra kaldıraç × maliyete göre:
 ## 5. Yayın / iletişim hattı (paralel, düşük efor)
 
 - HF model yayını (üstteki 4.6) + `hf_upload/` akışına grafting checkpoint desteği.
-- OSF güncelleme notu (`OSF_GUNCELLEME_NOTU.md` şablonuyla).
+- OSF güncelleme notu (`_arsiv/OSF_GUNCELLEME_NOTU.md (arşivlendi)` şablonuyla).
 - README'ye "Grafting quickstart" — üç satırlık kullanım.
 - (Opsiyonel) kısa teknik blog/thread: "O(1) bellek pretrained modele nasıl aşılanır" — dürüstlük çerçevesi korunarak.
 

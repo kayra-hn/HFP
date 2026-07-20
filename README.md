@@ -179,22 +179,33 @@ interpolation between additive (archival) and delta (updating) writes,
 `M += β·k(v − α·v_old)ᵀ`, solved chunkwise-parallel. Run
 `review_scripts/graft_smoke.py` first; the full training/validation pipeline
 (zero-shot sanity → Stage 1/2 → needle + constant-VRAM checks) is
-`notebooks/colab_graft_qwen_v2.ipynb`. Results pending — see
-`docs/internal_tr/SONRAKI_ADIMLAR_PLANI.md` for pre-registered criteria.
+`notebooks/colab_graft_qwen_v3_kaggle.ipynb`. **First complete run (2026-07-18):
+negative result** — the pipeline works end-to-end mechanically, but this
+configuration failed both quality criteria (PPL 2×, needle miss). Full honest
+record and follow-up hypotheses: [`RESULTS.md` §15](RESULTS.md); diagnostics:
+`notebooks/kaggle_graft_diagnostics_v1.ipynb`.
 
 ## Repository layout
 
 ```
-hfp/core/hfp_bulk_state.py        recurrent memory: M,z state, exp + cubic_flux decay, binding conv
-hfp/core/bulk_trigger_decoder.py  decoder layer: windowed attention + EntangledFFN
-hfp/models/modeling_hfp.py        HuggingFace-compatible model
-hfp/models/configuration_hfp.py   config
-hfp/models/grafting.py            Phase 3: HFP memory grafting onto pretrained LLMs
+hfp/                              the package
+  core/hfp_bulk_state.py          recurrent memory: M,z state, exp + cubic_flux decay, binding conv
+  core/bulk_trigger_decoder.py    decoder layer: windowed attention + EntangledFFN
+  models/modeling_hfp.py          HuggingFace-compatible model
+  models/configuration_hfp.py     config
+  models/grafting.py              Phase 3: HFP memory grafting onto pretrained LLMs
 run_experiment.py                 retention / recall / lm experiments
-smoke_test.py                     regression tests
+smoke_test.py                     regression tests (CI gate)
 train.py                          standard AdamW training loop
-docs/                             translations and internal planning notes
-notebooks/                        colab and kaggle evaluation notebooks
+eval_*.py                         memory-scaling / optimizer / passkey evals
+review_scripts/                   independent verification & analysis scripts (CI runs verify_claims.py)
+notebooks/                        Colab and Kaggle training/diagnostic notebooks
+examples/                         agent-framework integration demos (HFPAgentWrapper)
+hf_upload/                        Hugging Face release package (model card, standalone modeling files)
+docs/                             paper draft (.tex), OSF companion PDF, translations, internal notes
+assets/figures/                   generated figures (plot_plateau.py output)
+requirements.txt / pyproject.toml dependencies & package metadata
+LICENSE                           GNU AGPL-3.0 (full text)
 ```
 
 ## Papers and Decoupling from Physics
@@ -210,6 +221,7 @@ The authoritative record of the ML architecture's empirical performance is in [`
 
 ## License
 
-GNU AGPL v3.0. Commercial network deployment of this architecture or derivatives
-requires open-sourcing modifications under the same license. Code is AGPL-3.0;
-the OSF text/figures are licensed separately (see the OSF project).
+GNU AGPL v3.0 — full text in [`LICENSE`](LICENSE). Commercial network deployment
+of this architecture or derivatives requires open-sourcing modifications under
+the same license. Code is AGPL-3.0; the OSF text/figures are licensed separately
+(see the OSF project). Citation metadata: [`CITATION.cff`](CITATION.cff).

@@ -133,7 +133,7 @@ Sürücünün kapsadığı hücreler, amaç ve başarı kriterleri:
 4. **DPFP ölçekte nereye kadar?** key_dim 4× büyük modelde de girişim sınırını aşıyor mu, maliyet/fayda?
 5. ~~**Delta chunkwise ölçekte:** dense LM'de additive'i geçiyor mu?~~ **(HAYIR — K2, Ek 20)** eval@2048'de delta sayısal olarak daha kötü (additive 1.8 SE önde); reçete additive'e kilitlendi. Güncelleme-ağır *gerçek akış* (kod/diyalog) nişi hâlâ açık — delta orada yaşıyor.
 6. **LM-benchmark:** GPT-2'yi geçti (aynı-hedefli kıyas, Ek 15). GLA hükmü Ek 21'deki metrik artefaktıyla ASKIDA — düzeltilmiş tek-seed 55.4 vs 226.7 yönü koruyor; resmi hüküm pencereli + eş-hedefli yeniden koşumda. Kalan: Mamba.
-7. **Grafting:** HFP-belleği pretrained modele distille edilebilir mi? *(BAŞLADI: `hfp/models/grafting.py` + `colab_graft_qwen_v2.ipynb`; Qwen2.5-1.5B, 13/28 katman, kafa-başına bellek, α-gate melez yazım, teacher-forcing distilasyon. Smoke 6/6 geçti; Stage 1 koşulacak. Plan K3.)*
+7. **Grafting:** HFP-belleği pretrained modele distille edilebilir mi? *(BAŞLADI: `hfp/models/grafting.py` + `colab_graft_qwen_v3_kaggle.ipynb`; Qwen2.5-1.5B, 13/28 katman, kafa-başına bellek, α-gate melez yazım, teacher-forcing distilasyon. Smoke 6/6 geçti; Stage 1 koşulacak. Plan K3.)*
 8. **Streaming kararlılığı pratik fark yaratıyor mu?** cubic'in self-limiting'i (max|M| çok küçük) çok uzun akışta exp'e görünür avantaj mı?
 
 ---

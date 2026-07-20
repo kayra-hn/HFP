@@ -29,15 +29,20 @@ error.log
 hfp_hf_test_save/
 
 # Generated experiment outputs (never commit)
-checkpoints/                   # HFP_CKPT_DIR default; run artifacts
-review_scripts/*_results.txt   # sweep/dense/baseline/pure-memory result logs
+# HFP_CKPT_DIR default; run artifacts
+checkpoints/
+# sweep/dense/baseline/pure-memory result logs
+review_scripts/*_results.txt
 sweep_results.txt
 
 # Internal / legacy — not for the public repo
-FABLE_GOREV_PROMPT.md          # internal review-agent prompt (contains local paths)
-INCELEME_BRIFINGI.md           # internal review-agent brief (contains local paths)
-_legacy_reference/             # orphaned old model kept only for local diffing
-tinyshakespeare.txt            # dataset — fetch separately, don't commit
+# internal review-agent prompt/brief (local paths)
+FABLE_GOREV_PROMPT.md
+INCELEME_BRIFINGI.md
+# orphaned old model kept only for local diffing
+_legacy_reference/
+# dataset — fetch separately, don't commit
+tinyshakespeare.txt
 osf_companion_v22.tex          # transient build copy (see osf_companion.tex)
 
 # NOTE: review_scripts/ is now TRACKED (was fully ignored). The reproduction
@@ -59,3 +64,9 @@ REPO_STRUCTURE.md
 OSF_GUNCELLEME_NOTU.md
 YAYINLAMA_TALIMATI.md
 DEGISIKLIKLER.md
+
+# Session artifacts
+_commit_msg.txt
+
+# Local archive (not for the public repo)
+_arsiv/

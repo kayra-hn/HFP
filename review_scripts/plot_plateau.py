@@ -3,7 +3,7 @@
 #
 # PLATEAU_RETENTION_NOTE.md icin figurler. Veriler 8-seed GPU kosusundan
 # HARDCODE (Kaggle/dosyaya bagimli degil). Calistir: python review_scripts/plot_plateau.py
-# Gereksinim: numpy, matplotlib. Cikti: fig_plateau.png, fig_paired256.png
+# Gereksinim: numpy, matplotlib. Cikti: assets/figures/fig_plateau.png, assets/figures/fig_paired256.png
 
 import numpy as np
 import matplotlib
@@ -52,8 +52,9 @@ plt.xlabel("write→query gap (tokens)")
 plt.ylabel("recall accuracy (%)")
 plt.title("Plateau vs cliff: recall by gap (train@160 → eval@1280, 8 seeds)")
 plt.legend(); plt.grid(alpha=0.3); plt.tight_layout()
-plt.savefig("fig_plateau.png", dpi=150)
-print("yazildi: fig_plateau.png")
+import os; os.makedirs("assets/figures", exist_ok=True)
+plt.savefig("assets/figures/fig_plateau.png", dpi=150)
+print("yazildi: assets/figures/fig_plateau.png")
 
 # --- Figure 2: paired 256+ (exp vs cubic) ---
 plt.figure(figsize=(4.6, 4.6))
@@ -67,5 +68,5 @@ plt.xlabel("exp + dpfp,  256+ accuracy (%)")
 plt.ylabel("cubic + dpfp,  256+ accuracy (%)")
 plt.title(f"256+ gap, paired by seed\ncubic wins {int((d>0).sum())}/{n},  Δ={d.mean():+.1f}, t={t:.2f}")
 plt.legend(); plt.grid(alpha=0.3); plt.tight_layout()
-plt.savefig("fig_paired256.png", dpi=150)
-print("yazildi: fig_paired256.png")
+plt.savefig("assets/figures/fig_paired256.png", dpi=150)
+print("yazildi: assets/figures/fig_paired256.png")

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hfp"
+version = "2.1.0"
+description = "HFP (Hyper-Flux Projection): windowed local attention + O(1) per-layer recurrent memory with a cubic-plateau retention law"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "AGPL-3.0-only" }
+authors = [{ name = "Kayrahan Yılmaz" }]
+keywords = ["linear-attention", "long-context", "o1-memory", "recurrent-memory", "language-model"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: GNU Affero General Public License v3",
+  "Programming Language :: Python :: 3.10",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "torch>=2.1",
+  "transformers>=4.40",
+  "numpy>=1.24",
+]
+
+[project.urls]
+Repository = "https://github.com/kayra-hn/HFP"
+
+[tool.setuptools.packages.find]
+include = ["hfp*"]

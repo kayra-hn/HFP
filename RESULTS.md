@@ -145,7 +145,7 @@ finding (retention tasks) to language modeling: **train-short → infer-long is
 required**; long-context comparisons must evaluate short-trained weights at
 long lengths rather than train at length.
 
-## 12. External family baseline: GLA (K1 decision — WITHDRAWN, see §14)
+## 12. External family baseline: GLA (K1 decision — WITHDRAWN; superseded by §16)
 
 > **[Revision 2026-07-13]** This comparison mixed objectives: a metric artifact
 > (double-shifted labels, §14) means the HFP values below are *skip-one*
@@ -242,7 +242,243 @@ Practical consequence: train-short/full-attention → deploy with eval-time
 window + tiled PE is a zero-training fix that is simultaneously length-stable
 and O(1) at inference. (Single seed; diagnostic, not a headline claim.)
 
-## Reproduction
+## 15. Qwen2.5-1.5B graft, full 2-stage distillation run (single seed, negative result)
+
+First complete end-to-end graft experiment on a real pretrained LM
+(`notebooks/colab_graft_qwen_v3_kaggle.ipynb`, Kaggle T4, fp32, 2026-07-18).
+Config: `decay_mode=cubic_flux_chunked`, `write_rule=hybrid`,
+`key_feature_map=dpfp`, `rec_block=16`, odd-indexed layers grafted
+(~325k trainable params). Base PPL (WT-2 valid, seq 1024, 24 chunks): **7.96**.
+
+Run history (all numbers from the actual logs):
+
+- **Zero-shot (untrained graft):** PPL **2627** — sanity criterion `<1000`
+  **FAILED** (flagged at run time: weight transfer / output-scale suspect;
+  `out_gain` init 1.0 injects the untrained memory path at full scale).
+- **Stage 1** (teacher-forcing, layerwise MSE; WT-103 raw via S3, seq 1024,
+  700 steps): MSE 0.965 → **0.116**, plateau from ~450 steps (prior runs
+  reported ~0.07 — not reproduced here). `alpha_ort` 0.119 → 0.131.
+- **Stage 2** (logit-KL + LM loss, 600 steps): ran at **seq 128** — a
+  **deviation** forced by T4 memory (fp32 weights 6.2 GB + 151k-vocab logits;
+  seq 1024/512/256 all OOM). KL total 234 → noisy ~70-80 plateau (57-88 range,
+  no clean convergence in last 300 steps); LM CE 5.60 → ~3.39.
+- **Validation:** PPL 7.96 → **15.88** (**1.996×**; criterion ≤1.05×
+  **FAILED**). Needle test: **MISS at all lengths** (2048/8192/16384) — model
+  emits filler continuation, never retrieves the passphrase. Peak VRAM 11.86 GB;
+  grafted state remains O(1) (context-independent size) as designed.
+
+**§15a — Diagnostics (forward-only, `kaggle_graft_diagnostics_v1.ipynb`, 2026-07-18):**
+
+- **T1 (needle harness control):** plain Qwen (full attention) **FINDS** the
+  needle at L=2048 and 8192 → the harness is valid; §15's needle miss is a real
+  negative (the memory path never learned retrieval), not a broken test.
+- **T2 (out_gain init sweep, untrained graft, zero-shot PPL):** 1.0 → **2758.6**
+  (replicates §15's 2627); 0.1 → **168.1**; 0.01 → 4705.8. Sweet spot ≈0.1
+  (16× better start; `<1000` criterion met). Supports the bad-operating-point
+  hypothesis; 0.01 over-mutes 13 attention-replaced layers and collapses again.
+- **T3 (stage1_son autopsy):** alpha mean 0.131 (0.092-0.176), out_gain mean
+  0.746 (from init 1.0; no dead heads), decay mean 0.949. S1's optimizer chose
+  to *shrink* the memory output rather than make it useful — consistent with
+  the MSE 0.116 plateau and the needle miss.
+- **T4 + final.pt autopsy:** not run (final.pt was not attached as input);
+  pending — would sharpen the recall-mix decision but does not block Run 2.
+
+**Run 2 decision (single variable):** repeat S1+S2 with `out_gain` init **0.1**
+(everything else identical). Pre-registered expectations: zero-shot ≈168;
+S1 MSE plateau below 0.116; then S2 → PPL and needle re-measured. If PPL
+improves but needle still misses, the *next* single change is mixing synthetic
+recall data into S2.
+
+**§15b — Run 2, Stage 1 (2026-07-18, Kaggle T4):** MSE **0.150 → 0.067
+plateau** (~450+ steps; beats Run 1's 0.116 and matches the historical ~0.07);
+`alpha_ort` 0.119 → **0.143** (Run 1 stalled at 0.131 — the memory path now
+gains weight instead of being muted). Runtime 58 min.
+⚠️ **Deviation disclosure:** the single-variable plan was accidentally broken —
+S1 also ran at **seq 128** (a leftover of the T4-OOM setting), vs Run 1's
+seq 1024. So the plateau comparison (0.067 vs 0.116) is confounded by sequence
+length; the *initial*-MSE improvement (0.96 → 0.15) is still attributable to
+`out_gain` (independently supported by T2). Checkpoint:
+`checkpoints/graft_run2/hfp_graft_stage1_son.pt`. S2 + validation pending.
+
+**§15c — Run 2 complete (S2 + validation, 2026-07-18):** Zero-shot with
+out_gain=0.1: **168.8** — matches the §15a pre-registered expectation (~168)
+exactly. S2 (600 steps, seq 128): KL 62 → ~40 noisy, LM CE 3.78 → ~3.1.
+Validation: PPL 7.96 → **12.73** (**1.600×**; Run 1: 1.996× — improved, still
+fails ≤1.05×). Needle: **MISS at 2048/8192/16384** (unchanged). Peak VRAM
+11.86 GB. Verdict: the out_gain hypothesis is *partially* confirmed (better
+operating point → better final PPL), but retrieval never emerges from
+LM-only distillation — exactly the pre-registered branch condition.
+**Run 3 (single variable): mix synthetic recall passages into the S2 data**
+(needle-style documents where the teacher itself must retrieve, so the KL
+target directly supervises retrieval). Pre-registered expectations:
+PPL ≤ 12.73 (must not regress); needle @2048 target: FOUND; if mini-needle
+(≤ seq) is learned but 2048 still misses, the bottleneck is length
+generalization of the memory path, not the training signal.
+
+**§15d — Run 3 complete (2026-07-18):** S2 with 25% recall-mix, seq 128,
+everything else = Run 2. PPL 7.96 → **12.79** (1.608×; Run 2: 1.600× — no
+regression ✓, no improvement). Needle: **MISS at 2048/8192/16384** (unchanged).
+Periodic LM-CE dips to ~1.1 in the S2 logs confirm the recall batches were
+present (repetitive filler = easy CE).
+**Post-hoc design-flaw disclosure:** the recall documents fit inside a single
+seq-128 training window — needle and query were co-visible to the intact
+even-indexed *full-attention* layers, so the task was solvable **without the
+recurrent memory**; no cross-chunk write→carry→read pressure was ever applied.
+The eval needle, by contrast, spans many chunks. Run 3 therefore did **not**
+test the §15c hypothesis properly; the training signal for cross-chunk
+retrieval remained ≈0. **Fixed in Run 4** (implemented in the notebook):
+recall documents are now split across two chunks — needle in chunk A, query
+in chunk B; training runs A under streaming (state write, no grad), then B
+with loss. With `use_cache=False`, attention layers **cannot see A**; the only
+route to the needle is the recurrent state. Teacher KL targets come from a
+full-attention forward over A+B. Disclosed limitation: stream state is
+detached at the chunk boundary, so cross-chunk gradients reach only the
+*read* path (write path learns from B-internal writes). Validation now also
+measures needle @512 (near-regime control). Pre-registered expectations:
+PPL ≤ ~12.8 (no regression); needle @512 target FOUND; @512 found but @2048
+missed → length-generalization bottleneck; nothing found → read-path-only
+gradient insufficient, next change is non-detached TBPTT (repo code change).
+
+**§15e — Run 4 complete (2026-07-18): FIRST NEEDLE HIT.** Cross-chunk recall
+training (25% mix, adjacent A→B chunks). Validation: needle **@512 FOUND**
+("copper mountain" retrieved verbatim) — the first successful memory-path
+retrieval in the graft setting; with `use_cache=False` in training and the
+query 3-4 chunk boundaries away, the only route was write→carry→read through
+the O(1) state. @2048/8192/16384 still MISS → exactly the pre-registered
+**length-generalization** branch (training gap ≈1 chunk; eval needs ~15).
+PPL 7.96 → **12.92** (1.623×) — marginally above the ≤~12.8 expectation
+(12.73/12.79/12.92 across runs; treated as noise-level, disclosed). Recall
+batches' B-chunk CE dropped to ~0.65 during S2 (retrieval being learned).
+**Caveat (disclosed):** Run 4's training word list overlapped the eval secrets
+("copper", "mountain" appear in both), so a memorization objection is possible
+for the @512 hit — weakened by the @2048 miss (a memorizer would answer at any
+length), but not eliminated. **Eval hardened for Run 5:** secrets drawn from
+words never seen in training ('orange kettle' / 'purple ladder' /
+'crimson garden') and the hit criterion tightened to full-phrase match.
+**Run 5 (single variable): distance curriculum** — insert 0-12 random filler
+chunks between A and B (max trained carry ≈13 chunks ≈ 1.7k tokens; teacher
+uses `logits_to_keep` to bound memory). Pre-registered: @512 FOUND with
+out-of-training secrets (clean retrieval proof); @2048 target FOUND; @8192+
+informative (beyond trained range — §3's train-short→infer-long precedent
+applies or fails honestly); PPL stable ~12.9.
+
+**§15f — Run 5 complete (2026-07-18): LONG-RANGE RETRIEVAL, CLEAN EVAL.**
+Hardened needle (secrets never seen in training, full-phrase criterion):
+**@512 FOUND, @2048 MISS, @8192 FOUND, @16384 FOUND** ("purple ladder"
+retrieved verbatim at ~7k and ~14k token distances — far beyond the trained
+carry range of ~1.7k; the §3 train-short→infer-long behavior appears in the
+graft setting). The memorization objection from §15e is **closed**: these
+words never appeared in training. Honest caveats: (1) the @2048 miss is a
+**non-monotonic anomaly** — retrieval is real but not yet position/length-
+reliable, and this is a single seed; a reliability grid (L × insertion ×
+seed, forward-only) is required before any headline claim. (2) PPL drifted
+7.96 → **13.04** (1.639×; 12.73 → 12.79 → 12.92 → 13.04 across runs) — the
+recall mix slightly taxes LM quality; the ≤1.05× criterion remains failed.
+Checkpoint: Run 5 `final.pt` (Kaggle output; to be archived).
+
+**§15g — Needle reliability grid (Run 5 final; 5 lengths × 3 insertion
+positions × 3 seeds; out-of-training secrets, full-phrase criterion):**
+
+| L \ insertion | 0.125 | 0.5 | 0.875 |
+|---|---|---|---|
+| 512  | 3/3 | 3/3 | 3/3 |
+| 1024 | 3/3 | 3/3 | 3/3 |
+| 2048 | 2/3 | 3/3 | 3/3 |
+| 4096 | 1/3 | 0/3 | 3/3 |
+| 8192 | 3/3 | 2/3 | 3/3 |
+
+**§15h (PRE-REGISTERED, pending) — Run 6: the controlled cubic-vs-exp graft
+comparison.** All five graft runs so far used `cubic_flux_chunked` only, so the
+project's distinctive retention-law claim is **untested in the graft setting**.
+Run 6 = exact twin of Run 5 with the single change `decay_mode='exp'` (same S1
+protocol/init/data, same distance-curriculum S2, same hardened eval + grid).
+Criteria written before running: primary = reliability grid + needle set;
+secondary = final PPL. Possible verdicts, all recordable: exp ≥ cubic on both →
+the cubic angle is unsupported at LLM scale (honest negative; retention law
+doesn't matter here); cubic > exp at long distances → first controlled
+mechanism win for the physics-derived law at LLM scale; mixed → map the
+trade-off. Mode-mismatch resume guard added to the notebook (exp/cubic
+checkpoints cannot cross-load silently).
+
+**§15h partial result (Run 6 complete, 2026-07-19):** point-set eval shows
+**no detectable difference**: PPL cubic 13.04 (1.639×) vs exp **12.87**
+(1.618×; marginally better, within the 12.73-13.04 run-to-run noise band);
+needle pattern **identical** (FOUND @512/@8192/@16384, MISS @2048 — before
+grid averaging). Interim honest reading: at this resolution the retrieval
+capability is attributable to the **cross-chunk training protocol, not the
+retention law**; the cubic angle is so far unsupported at LLM scale. Final
+verdict awaits the pre-registered primary criterion: the 45-point reliability
+grid on the exp final (cubic reference: 38/45, with the 4096-early/mid trough).
+
+**§15h FINAL VERDICT (exp grid complete, 2026-07-19; identity-verified
+out_gain 0.239):** exp grid **42/45 (93%)** vs cubic 38/45 (84%). Per-length:
+exp is 9/9 at 512/1024/4096/8192 — **cubic's 4096-early/mid trough does not
+exist under exp** — with one weak cell (2048@0.125: 0/3; cubic had 2/3 there).
+Statistical caution: 42 vs 38 alone is not decisive (two-proportion p≈0.18),
+but the direction agrees with PPL (exp 12.87 vs cubic 13.04) and nothing
+favors cubic. **Verdict: in the graft setting, the cubic-plateau retention law
+provides no measurable advantage over plain exponential decay; the long-range
+retrieval capability belongs to the cross-chunk distillation protocol, which
+works under either law.** This is the honest negative for the project's
+distinctive mechanism at LLM scale (its remaining support: the small-scale
+long-horizon result, §6, itself thin). Curious side observation (unexplained,
+logged): with the exp final, short-needle using *training-vocabulary* secrets
+("copper mountain") missed @512 while the clean-vocabulary grid was 9/9 @512 —
+trained-pair interference/competition is a plausible but untested explanation.
+Exp diagnostics T2 replication: zero-shot 3623 (gain 1.0) / 191.8 (0.1) /
+4802 (0.01) — same U-shape as cubic (2758/168/4706).
+
+Total **38/45 (84%)**; 13/15 cells reliable (≥2/3). Readings: (1) §15f's
+@2048 "anomaly" was **noise** — 2048 is 8/9 overall. (2) The real weak zone
+is **4096 with early/mid insertion** (1/3, 0/3) — reliability is not monotonic
+in distance (8192@0.125 is 3/3), so the trough is not simple decay; plausibly
+an interference/saturation interaction with the filler period — untested,
+listed as an open question. (3) Defensible claim as of now: *a 325k-parameter
+graft distilled on a free T4 gives a Qwen2.5-1.5B hybrid with O(1) grafted-layer
+state that retrieves out-of-training passphrases across 512-8192+ token
+distances with ~84% grid reliability* — single trained model, single training
+seed; multi-seed training replication still pending. PPL cost (1.6×) remains
+the main open quality gap.
+
+Honest reading: the graft pipeline is now *mechanically* validated end-to-end
+(resume, streaming, chunked recurrence, checkpointing all work), but this
+configuration **does not** preserve LM quality (2× PPL) and shows **no
+long-range retrieval** on needle. Likely contributors, in testable order:
+(1) bad untrained operating point (zero-shot 2627 ≫ 1000; try small `out_gain`
+init / teacher weight transfer); (2) Stage 2 at seq 128 shortens the
+distillation context far below the eval regime; (3) noisy KL plateau suggests
+LR/temperature/KL-weight retuning or longer S2; (4) distillation on WT-103 alone gives
+zero training signal for retrieval — needle-style recall may need explicit
+recall data mixed into S2. Single seed; no cherry-picking — this section is the
+complete record of the run.
+
+## 16. K1 gate, clean re-run: GLA family baseline v2 (3 seeds, corrected objective)
+
+Supersedes the withdrawn §12. `colab_gla_benchmark_v3.ipynb` "Görev B v2":
+matched next-token objective (the §14 double-shift artifact fixed and
+regression-checked in-notebook), seq 256 training, ~16M params, 3 seeds per
+arm, GLA LR selected by sweep (Görev A). Best val loss per seed:
+
+| arm | s0 | s1 | s2 | mean ± std | PPL(mean) | NaN |
+|---|---|---|---|---|---|---|
+| **HFP cubic+additive+dpfp** | 5.2137 | 5.2156 | 5.2089 | **5.213 ± 0.003** | **183.6** | 0/3 |
+| HFP cubic+delta+dpfp | 5.2687 | 5.2667 | 5.2247 | 5.253 ± 0.025 | 191.2 | 0/3 |
+| GLA baseline | 5.4575 | 5.4513 | 5.3627 | 5.424 ± 0.053 | 226.7 | **3/3 diverged** |
+
+**K1 verdict: PASSED.** HFP-additive beats the GLA baseline by **0.211 nats**
+(HFP −19% PPL, equivalently GLA +23.5%) — ~4× the largest seed-std — and every
+GLA seed diverged (NaN @2420/@2521/@3503) while all six HFP runs were stable
+to early-stop. Fairness caveats (disclosed): the GLA arm is our in-house
+`GLAForCausalLM` wrapper — its universal divergence may reflect
+implementation/tuning weakness rather than the GLA method itself; claim is
+scoped to *this implementation at this budget*. Length sweep (val loss
+256→2048): HFP arms degrade by ~+0.11-0.12 nats (they run the full-attention
+LM config, consistent with §14's attention-driven diagnosis; the §14 window+PE
+recipe is the known fix), while GLA is flat-to-mixed (−0.11/−0.03/+0.07 across
+seeds) from a much worse base. At eval-2048 the means are: HFP-add **~213
+PPL**, HFP-del ~225, GLA ~226 — HFP-add still leads, the delta arm's margin
+vanishes, and GLA's best seed (197.8) crosses below the HFP-add mean
+(single-seed crossover under high GLA variance ±0.053; not averaged away).
 
 ```bash
 python smoke_test.py

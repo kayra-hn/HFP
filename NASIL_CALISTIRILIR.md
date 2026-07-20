@@ -76,3 +76,24 @@ python eval_memory_scaling.py
 Sabit-VRAM eğrisini üretir. Dürüst sunum: bu eğri tek başına "bellek çalışıyor"
 demek değildir (hiçbir şey hatırlamayan sabit state de düz çizgi verir);
 §1'deki chunked-recall sonucuyla BİRLİKTE sun.
+
+## 6. Google ADK Entegrasyonu (Deneysel)
+Google Agent Development Kit (ADK) entegrasyonu, HFP'yi otonom ajanların
+bir "aracı (tool)" veya bellek arka ucu olarak kullanması için geliştirilmektedir.
+Önemli Not: HFP **AGPL-3.0** lisanslıdır; dış servislerden bağlanırken bu
+lisans sınırlarına uyulmalıdır (açık kaynak SDK'lar uyumludur).
+
+**Kurulum:**
+```bash
+python -m pip install google-adk google-genai
+```
+**Kullanım Arayüzü:**
+`hfp/agent_integration.py` içerisinde `HFPAgentWrapper` sınıfı yer almaktadır.
+Bu sınıf cihaz içi O(1) sabit bellek özelliği kullanılarak chunked çalışma
+destekler. Agent'a tool olarak bağlamak için:
+```python
+from hfp.agent_integration import HFPAgentWrapper
+# config=None verilirse varsayılan model mimarisi yüklenir
+agent_hfp = HFPAgentWrapper(device="cpu")
+# agent_hfp.generate_response(...) ile aracı tetikleyebilirsiniz.
+```
