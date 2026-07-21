@@ -599,6 +599,45 @@ was trained to carry, when queried the way it was trained". If it still
 collapses, the architecture (state size / read path) becomes the prime suspect
 and §17-§19 stand as a chain of four eliminated explanations.
 
+## 20. Görev F — matched probe: the failure is the FIRST chunk boundary, not distance
+
+`review_scripts/matched_probe.py` on the Görev E checkpoints (no retraining):
+the probe scene is generated from the *training* distribution (dense chunk A
+with the target at the boundary → K filler chunks → dense chunk B, query at the
+end), and the old §17-style probe is measured in the same run. Seed-mean over
+2 modes × 3 seeds, chance 3.3%:
+
+| K | ~tokens | matched | old probe |
+|---|---|---|---|
+| **0** | 0 | **24.4%** | **100.0%** |
+| 1 | 256 | 8.3 | 11.7 |
+| 2 | 512 | 6.7 | 3.3 |
+| 4 | 1024 | 1.1 | 1.1 |
+| 8 | 2048 | 6.1 | 5.0 |
+| 16 | 4096 | 3.4 | 2.8 |
+| 32 | 8192 | 5.5 | 1.6 |
+| 64 | 16384 | 2.2 | 0.5 |
+
+**The K=0 row reframes everything.** With write and query inside the *same*
+chunk the old probe is **100% correct** — the associative read itself is
+perfect. One chunk boundary (K=1) drops it to 11.7%, and from K≥2 everything is
+at chance, flat in distance. So the failure is **not** decay (§15h), **not**
+capacity (§18), **not** curriculum (§19), and **not** probe mismatch (matched ≈
+old for K≥1): it is the **first cross-chunk state hand-off**. Distance is
+irrelevant once that hand-off has failed — which is exactly why every
+distance-based hypothesis died.
+**Prime suspect, and it is testable in minutes:** the streaming state path at
+eval (`past_key_values` round-trip: `_offset_from_state`, conv-state carry,
+`detach_state`) does not reproduce the state that training produces internally
+— note §19's contradiction (training lossB *did* fall to 1.51-2.23 with K up to
+14, i.e. the same hand-off works when done inside the training loop). Next
+diagnostic, no training required: take one sequence, run it (a) in one shot and
+(b) chunked with `use_cache`, and compare the memory tensors (M, z) and the
+logits at the identical final position; `smoke_test.py` T4 already asserts
+chunk-consistency for the *non-cached* path, so a discrepancy would localize to
+the cached/streaming route. If M/z match but logits do not, the bug is in the
+read path/position handling; if M/z diverge, it is in the state carry itself.
+
 ## Reproduction
 
 ```bash
