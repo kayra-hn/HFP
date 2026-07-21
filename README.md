@@ -60,7 +60,11 @@ A fixed-size recurrent memory must forget. *How* it forgets is the design choice
 
 Set the mode with `decay_mode="exp"` / `"cubic_flux"` (config) or
 `--decay_mode` (CLI). Everything else is held identical, so the two modes are a
-clean controlled comparison of the retention law alone.
+clean controlled comparison of the retention law alone. That comparison has now
+been run at LLM-graft scale and found **no measurable difference** between the
+laws (RESULTS §15h) — the framework's honest answer so far is that *which*
+retention law matters less than how the memory is trained; the law remains a
+switchable axis, with `exp` the pragmatic default for new work.
 
 ## Architecture
 
@@ -179,10 +183,23 @@ interpolation between additive (archival) and delta (updating) writes,
 `M += β·k(v − α·v_old)ᵀ`, solved chunkwise-parallel. Run
 `review_scripts/graft_smoke.py` first; the full training/validation pipeline
 (zero-shot sanity → Stage 1/2 → needle + constant-VRAM checks) is
-`notebooks/colab_graft_qwen_v3_kaggle.ipynb`. **First complete run (2026-07-18):
-negative result** — the pipeline works end-to-end mechanically, but this
-configuration failed both quality criteria (PPL 2×, needle miss). Full honest
-record and follow-up hypotheses: [`RESULTS.md` §15](RESULTS.md); diagnostics:
+`notebooks/colab_graft_qwen_v3_kaggle.ipynb`.
+
+**Status after six runs (2026-07-18/19, full honest record in
+[`RESULTS.md` §15-§15h](RESULTS.md)):** the decisive ingredient turned out to
+be a **cross-chunk recall distillation curriculum** — recall documents split
+across chunk boundaries so attention cannot see the needle and the teacher's
+full-attention retrieval becomes the KL target for the memory path. With it,
+the 325k-parameter graft retrieves **never-seen-in-training passphrases at
+512-16384 token distances** (reliability grid over 5 lengths × 3 positions ×
+3 seeds: 38/45 for cubic, 42/45 for exp), trained entirely on a free T4.
+An in-window recall mix teaches nothing (ablated: Run 3 vs Run 4) — the
+cross-chunk structure is causal. A controlled retention-law ablation
+(identical twin runs) found **no measurable cubic-vs-exp difference** (PPL
+13.04 vs 12.87; grids above): the retrieval capability belongs to the
+protocol, not the decay law. Open gaps, also recorded: LM quality cost is
+still ~1.6× PPL (criterion ≤1.05× not met), one weak grid cell per law, and
+all of this is a single training seed per arm. Diagnostics:
 `notebooks/kaggle_graft_diagnostics_v1.ipynb`.
 
 ## Repository layout
@@ -217,7 +234,7 @@ While the architecture is *inspired* by the theoretical frameworks in Papers I a
 **This description supersedes any earlier, marketing-styled summary of HFP.**
 The physics does not validate the ML architecture, and the ML results do not serve as proof of the physics. There is no active "Ryu–Takayanagi bound", "Witten propagator", "5D curvature" or "quantized-energy scheduler" in the trained path. 
 
-The authoritative record of the ML architecture's empirical performance is in [`RESULTS.md`](RESULTS.md) (and its Turkish translation `docs/tr/DENEY_SONUCLARI.md`). The only architecture-level results demonstrated so far are the **DPFP capacity axis**, **train-short / infer-long length generalization**, the **`cubic_flux` long horizon retention advantage**, and **initial small-scale LM viability**.
+The authoritative record of the ML architecture's empirical performance is in [`RESULTS.md`](RESULTS.md) (and its Turkish translation `docs/tr/DENEY_SONUCLARI.md`). Demonstrated so far: the **DPFP capacity axis** (§5), **train-short / infer-long length generalization** (§3), **initial small-scale LM viability** (§7, §10), the **K1 family-baseline gate passed** against an in-house GLA implementation (§16: −0.211 nats over 3 seeds, all GLA seeds diverged), and — the current headline — **long-range retrieval grafted onto a pretrained LLM via cross-chunk distillation** (§15f-g). On the retention law itself, honesty requires stating both directions: the small-scale long-horizon advantage of `cubic_flux` (§6) remains on record, but a controlled ablation at LLM-graft scale found **no measurable cubic-vs-exp difference** (§15h), and neither law survived an out-of-training-regime lifetime probe at small scale (§17-§20a, under active investigation — the current suspect is a training-recipe issue: learned decay calibrated to the training window plus detached chunk boundaries, not the architecture).
 
 ## License
 
