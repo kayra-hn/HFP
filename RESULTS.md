@@ -690,6 +690,22 @@ replication — BEKLEYEN_ISLER #5, #8). Anyone resuming this thread should start
 with: (a) one-shot vs cached M/z+logit equality check (§20), (b) decay.grad
 nonzero check under TBPTT, (c) read-path norm analysis at long range.
 
+## 22. PRE-REGISTERED: graft density (Run 7) and multi-seed replication (Runs 8-9)
+
+Written before running; single parametrized notebook
+(`colab_graft_qwen_v3_kaggle.ipynb`, RUN_SEED / GRAFT_N block).
+**Run 7 — density:** GRAFT_N=6 (layers [3,7,11,15,19,23]), exp, seed 0,
+distance-curriculum S2, single session (FORCE_S2). Hypothesis: the ~1.6× PPL
+cost is the structural price of replacing 13/28 attention layers; halving the
+graft should recover quality. Criteria: **PASS** = PPL ≤ 1.2× (≤9.55) AND
+needle FOUND @512/8192/16384; **TRADE-OFF** = PPL improves but needle degrades
+(map it, decide density later); **FAIL** = PPL stays ≥1.5× (density is not the
+driver; suspect write-rule/norm interactions instead).
+**Runs 8-9 — multi-seed:** GRAFT_N=13, exp, seeds 1 and 2 (Run 6 = seed 0).
+Criteria: headline claim survives if needle @512/8192/16384 is FOUND in ≥2/3
+seeds and PPL stays in the 12.7-13.1 band; any seed diverging materially is
+reported as-is.
+
 ## Reproduction
 
 ```bash

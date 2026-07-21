@@ -23,15 +23,15 @@
 
 ## Graft hattı — açık teknik işler
 
-5. **PPL 1.6× uçurumu:** graft yoğunluğu deneyi (13→6 katman, tek değişken).
-   Kriter taslağı: PPL ≤1.2×'e inerken ızgara ≥%80 kalmalı.
+5. **[KOŞUYA HAZIR — Run 7]** PPL 1.6× uçurumu: graft yoğunluğu (13→6 katman).
+   Ön-kayıt RESULTS §22; notebook parametreli (GRAFT_N=6, RUN_SEED=0).
 6. **exp'in 2048-erken deliği (0/3) + cubic'in 4096 çukuru:** güvenilirlik
    mühendisliği — müfredat yoğunluğu/karışım oranı taraması.
 7. **Eğitilmiş-çift girişimi anomalisi:** "copper mountain" @512 ıskalarken
    temiz kelimeler 9/9 (§15h yan gözlem). Ucuz teşhis: eğitim-kelimeli T5
    mini-ızgarası.
-8. **Çok-seed graft replikasyonu:** Run 5/6 protokolü × 3 eğitim seed'i
-   (manşet iddia öncesi şart).
+8. **[KOŞUYA HAZIR — Run 8/9]** Çok-seed graft replikasyonu: seeds 1,2
+   (Run 6 = seed 0). Ön-kayıt RESULTS §22 (GRAFT_N=13, RUN_SEED=1/2).
 
 ## Repo / yayın hijyeni
 
