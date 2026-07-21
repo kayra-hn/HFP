@@ -74,10 +74,13 @@ P = int(os.environ.get("CC_P", "6"))                    # chunk-ici dense cift s
 GAPS = [int(g) for g in os.environ.get("CC_GAPS", "256,1024,4096,16384").split(",")]
 TRIALS = int(os.environ.get("CC_TRIALS", "30"))
 DIST_EVERY = int(os.environ.get("CC_DIST_EVERY", "64"))
+# [GOREV G] CC_BPTT=1: chunk siniri DETACH edilmez -> B'nin loss'u decay/yazma
+# yoluna sinir otesinden gradyan tasir (§20a hipotezinin dogrudan mudahalesi).
+BPTT = os.environ.get("CC_BPTT", "0") == "1"
 
 KLO, KHI, VLO, VHI, FHI = 100, 130, 130, 160, 100      # sans = 1/30
 WIN, ANS = 8, 0
-TAG = f"carryv1_{MODE}_s{SEED}"
+TAG = f"carryv1{'t' if BPTT else ''}_{MODE}_s{SEED}"   # t = tbptt kolu
 CKPT = f"{CKDIR}/{TAG}.pt"
 
 random.seed(SEED); np.random.seed(SEED); torch.manual_seed(SEED)
@@ -85,7 +88,8 @@ cfg = HFPConfig(vocab_size=VHI + 4, hidden_size=64, num_hidden_layers=2,
                 num_attention_heads=2, intermediate_size=256, bulk_dim=32,
                 short_len=8, max_position_embeddings=CTX + 8, local_window=WIN,
                 decay_mode=MODE, rec_block=32, write_rule="additive",
-                key_feature_map="dpfp", pe_period=CTX)
+                key_feature_map="dpfp", pe_period=CTX,
+                bptt_across_chunks=BPTT)   # [GOREV G] icsel detach kapatilir
 model = HFPForCausalLM(cfg)
 DEV = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(DEV)
@@ -164,21 +168,35 @@ while step < STEPS and time.time() - t0 < BUDGET:
     xb = torch.tensor(B, device=DEV); yb = torch.tensor(BL, device=DEV)
 
     opt.zero_grad(set_to_none=True)
-    # A: chunk-ici dense loss (yazma yolu ogrenir) + state uret
-    out_a = model(xa, labels=ya, use_cache=True)
-    past = out_a.past_key_values
-    loss_a = out_a.loss
-    loss_a.backward()                      # A'nin grafigini hemen bosalt
-    # dolgu chunklari: state tasinir, gradyan yok
-    with torch.no_grad():
+    if BPTT:
+        # [GOREV G] TAM gradyan: A -> dolgular -> B tek grafik; sinirda detach YOK.
+        # B'nin cross-chunk hatasi decay/yazma parametrelerine geri akar.
+        out_a = model(xa, labels=ya, use_cache=True)
+        past = out_a.past_key_values
         for j in range(K):
             xf = torch.tensor([FS[i][j] for i in range(BS)], device=DEV)
             past = model(xf, past_key_values=past, use_cache=True).past_key_values
-    past = [tuple(t.detach() if torch.is_tensor(t) else t for t in st_) for st_ in past]
-    # B: yalniz bellekten okuma (attention A'yi goremez) — asil hedef
-    out_b = model(xb, labels=yb, past_key_values=past, use_cache=True)
-    assert torch.isfinite(out_b.loss), f"NaN {TAG} step {step}"
-    out_b.loss.backward()
+        out_b = model(xb, labels=yb, past_key_values=past, use_cache=True)
+        loss_a = out_a.loss
+        total = loss_a + out_b.loss
+        assert torch.isfinite(total), f"NaN {TAG} step {step}"
+        total.backward()
+    else:
+        # A: chunk-ici dense loss (yazma yolu ogrenir) + state uret
+        out_a = model(xa, labels=ya, use_cache=True)
+        past = out_a.past_key_values
+        loss_a = out_a.loss
+        loss_a.backward()                      # A'nin grafigini hemen bosalt
+        # dolgu chunklari: state tasinir, gradyan yok
+        with torch.no_grad():
+            for j in range(K):
+                xf = torch.tensor([FS[i][j] for i in range(BS)], device=DEV)
+                past = model(xf, past_key_values=past, use_cache=True).past_key_values
+        past = [tuple(t.detach() if torch.is_tensor(t) else t for t in st_) for st_ in past]
+        # B: yalniz bellekten okuma (attention A'yi goremez) — asil hedef
+        out_b = model(xb, labels=yb, past_key_values=past, use_cache=True)
+        assert torch.isfinite(out_b.loss), f"NaN {TAG} step {step}"
+        out_b.loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
     opt.step(); sch.step()
     if step % 100 == 0:
