@@ -663,6 +663,33 @@ appears, the §17-§20 chain reduces to "learned decay + detach", a
 is unaffected either way (separate streaming implementation; its long-range
 retrieval empirically works, §15f-g).
 
+## 21. Görev G — TBPTT intervention: accuracy unmoved; the decay-erasure story falls
+
+TBPTT arms (`bptt_across_chunks=True`, no manual detach, full graph through
+K≤16 chunks; else identical to §19), 2 modes × 3 seeds. Far-gap accuracy is
+**unchanged** (4096/16384 best: 2.2%/2.2%; §19: 4.4/2.2 — noise-level).
+Decay autopsy after training: λ_mean 0.948-0.950, λ_max 0.999, 19-22 channels
+>0.995 (max single-chunk survival 76-81%). **Criterion flaw disclosed:** my
+pre-registered check ("do λ≥0.995 channels exist?") lacked an *init* baseline —
+and the stats are **identical to 4 decimals across all three cubic seeds**,
+which independent trainings do not produce: the decay parameters are
+effectively **frozen at initialization** in every arm. Two consequences:
+(1) the §20a "decay erases the state" story **falls** — high-λ channels
+(77%/chunk survival) exist from init, so information *could* persist several
+chunks, yet accuracy still dies at the first boundary; (2) a sharper puzzle
+replaces it: target logprob *worsens systematically with distance*
+(−3.3 → −5.2) — the model assigns actively lower probability to the correct
+value, a **read-path/dilution signature** rather than erasure — and decay's
+frozenness raises the question of whether gradient reaches it at all even
+under the TBPTT flag (worth a 5-minute `decay.grad` probe).
+**Status: the small-scale lifetime line is parked here as an open engineering
+question** (§17-§21: five eliminated/weakened explanations, current suspects =
+read-path dilution and decay-gradient plumbing). The line consumed its budget;
+the priority returns to the healthy graft mainline (PPL gap, multi-seed
+replication — BEKLEYEN_ISLER #5, #8). Anyone resuming this thread should start
+with: (a) one-shot vs cached M/z+logit equality check (§20), (b) decay.grad
+nonzero check under TBPTT, (c) read-path norm analysis at long range.
+
 ## Reproduction
 
 ```bash

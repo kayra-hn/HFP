@@ -4,9 +4,10 @@
 
 ## Şimdi (bu hafta)
 
-1. **[KOŞUDA] Görev C — Ömür Testi** (`review_scripts/lifetime_retention.py`):
-   cubic'in gerçek habitat sınavı. 2 mod × 3 seed; kriterler script başında
-   ön-kayıtlı. Sonuç → RESULTS yeni bölüm + cubic'in kaderi kararı.
+1. **[PARK EDİLDİ] Küçük-ölçek ömür hattı (§17-§21):** beş açıklama
+   elendi/zayıfladı; güncel şüpheliler okuma-yolu seyreltmesi + decay-gradyan
+   tesisatı. Devam edecek kişi için başlangıç adımları RESULTS §21 sonunda.
+   (Görev C/D/E/F/G scriptleri ve notebook'ları repoda.)
 2. **Commit + push** (bu dosya dahil): §15-15h zinciri, §16/K1, LICENSE paketi,
    Görev C scripti. CI yeşilini doğrula.
 
