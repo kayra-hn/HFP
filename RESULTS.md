@@ -638,6 +638,31 @@ chunk-consistency for the *non-cached* path, so a discrepancy would localize to
 the cached/streaming route. If M/z match but logits do not, the bug is in the
 read path/position handling; if M/z diverge, it is in the state carry itself.
 
+**§20a — correction to §19's inference, and a unifying hypothesis.** §19
+claimed "training *did* learn the cross-chunk task" from lossB falling to
+1.51-2.23. That inference was **flawed**: lossB averages over *all* supervised
+positions in chunk B — six easy in-chunk pairs plus only one cross-chunk
+target — so its fall mostly reflects in-chunk learning. The contradiction that
+motivated the "harness mismatch" reading partially dissolves; training may
+never have learned the hand-off either. **Unifying hypothesis (untested,
+checkable in minutes):** the learned decay is calibrated to training-window
+distances — §17's autopsy showed sigmoid(decay) mean **0.949/token**, i.e.
+survival across one 256-token chunk ≈ 0.949²⁵⁶ ≈ 2·10⁻⁶: the state is
+mathematically *erased* at the first boundary. And it cannot learn slower
+decay from cross-chunk experience because the state is **detached at chunk
+boundaries** (`bptt_across_chunks=False`), so no gradient ever reaches the
+write/decay path from beyond the boundary. This one story explains K=0
+perfection, K=1 collapse, distance-independence, curriculum failure (§19) and
+sparsity independence (§18). Two cheap checks decide it: (1) checkpoint
+autopsy — per-channel **max** sigmoid(decay) (long-range survival needs
+λ→0.999+; if no channel exceeds ~0.99 the story holds); (2) retrain the small
+model with the existing `bptt_across_chunks=True` flag (K2/TBPTT path, already
+implemented in `modeling_hfp.py`) and re-run §17 — if far-gap accuracy
+appears, the §17-§20 chain reduces to "learned decay + detach", a
+*training-recipe* finding rather than an architecture defect. The graft line
+is unaffected either way (separate streaming implementation; its long-range
+retrieval empirically works, §15f-g).
+
 ## Reproduction
 
 ```bash
