@@ -192,6 +192,13 @@ if step < STEPS:
     print(f"[{TAG}] CKPT {step}/{STEPS} — butce bitti, tekrar calistir (resume eder)")
     sys.exit(0)
 
+# [FIX] Egitim TAMAMLANDIYSA da checkpointi kaydet — Gorev F (matched_probe)
+# bu dosyayi kullanir; onceden yalniz "butce doldu" halinde kaydediliyordu.
+torch.save(dict(m=model.state_dict(), o=opt.state_dict(), s=sch.state_dict(),
+                step=step, rng=random.getstate(), nprng=np.random.get_state(),
+                trng=torch.get_rng_state()), CKPT)
+print(f"[{TAG}] egitim tamam -> checkpoint kaydedildi: {CKPT}")
+
 # [PLATO KORUMASI] cross-chunk gorevi ogrenilmediyse kiyas gecersiz
 with torch.no_grad():
     a, al, fills, b, bl = carry_example(2)
