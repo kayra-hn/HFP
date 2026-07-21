@@ -558,6 +558,47 @@ it was trained to carry"* — an honest, testable, and useful statement.
 Logged anomaly (single seed, not a claim): cubic s2 at the sparsest setting
 hit 26.7% (8/30) while its sibling seeds scored 0.0%.
 
+## 19. Görev E — carry curriculum: rejected too, and a train/eval mismatch found
+
+Pre-registered test of the last remaining explanation for §17
+(`review_scripts/carry_curriculum.py`): train *cross-chunk* carries (target in
+chunk A, query in chunk B, K filler chunks between, `use_cache` streaming so
+attention cannot see A), K annealed 0→16 (~4096 tokens of trained carry), then
+re-run the §17 lifetime probe unchanged. Seed-mean accuracy (chance 3.3%):
+
+| gap | exp §17 | exp §19 | cubic §17 | cubic §19 |
+|---|---|---|---|---|
+| 256 | 15.6 | 6.7 | 18.9 | **20.0** |
+| 1024 | 4.4 | 5.5 | 2.2 | 4.4 |
+| 4096 | 1.1 | 3.3 | 2.2 | 4.4 |
+| 16384 | 5.6 | 1.1 | 2.2 | 2.2 |
+
+**Verdict: FAILED by the pre-registered criterion** (far gaps ≤4.4%, below even
+the 8% "rejected" line). So for the small model the collapse is explained by
+neither the retention law (§15h), nor capacity (§18), nor carry curriculum.
+
+**But the run exposes a contradiction that is more informative than the verdict:
+training *did* learn the cross-chunk task** — lossB (query chunk, memory-only
+route) fell 3.45 → 1.51-2.23 (cubic arms lowest), i.e. at K=14 (~3600 tokens)
+the model reads what it wrote through the O(1) state. Yet the eval probe at the
+same distance is at chance. Learned-but-not-transferred ⇒ the two are **not the
+same task**. Concrete mismatches, all mine to fix, in likely order of impact:
+(1) *write context*: training writes the target inside a dense chunk aligned to
+the chunk boundary (positions CTX-2/CTX-1), eval writes it as the first two
+tokens of an otherwise empty stream; (2) *query context*: training queries at
+the end of a dense chunk (many local cues), eval queries a bare key token;
+(3) *distractor statistics* differ between the two paths. Note cubic ≥ exp on
+5/8 cells here and had the lowest training loss — logged, not claimed (all
+differences ≤1-2 hits).
+**Next step is a harness fix, not a new hypothesis:** make the eval probe
+generate its write/query context from the *training* distribution (dense chunk,
+boundary-aligned target), keeping only distance as the manipulated variable. If
+accuracy then tracks the trained carry range, §17's collapse was an eval
+artifact all along and the honest claim becomes "retains over the distances it
+was trained to carry, when queried the way it was trained". If it still
+collapses, the architecture (state size / read path) becomes the prime suspect
+and §17-§19 stand as a chain of four eliminated explanations.
+
 ## Reproduction
 
 ```bash
