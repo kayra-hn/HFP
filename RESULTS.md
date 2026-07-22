@@ -722,6 +722,14 @@ seed 0) instead of the originally listed 13-layer config, since the headline
 claim now attaches to the 6-layer artifact. Criteria adapted accordingly:
 needle @512/2048/8192/16384 FOUND in ≥2/3 seeds; PPL within 8.6-9.1.
 
+**§22b — Run 8 (seed 1, Colab T4, 2026-07-21): PASS.** PPL 7.96 → **8.84
+(1.111×)**, needle **4/4** (512/2048/8192/16384, out-of-training vocab). Nearly
+identical to Run 7 (8.84, 1.112×) — a remarkably tight replication, plausible
+given the small (325k) adapter distilling to the same teacher. Peak VRAM
+14.37 GB (Colab environment; 9.28 GB on Kaggle for the same recipe — allocator/
+environment difference, both within T4). The ≥2/3 needle criterion is already
+met with 2/2; Run 9 (seed 2) completes the pre-registered set.
+
 ## Reproduction
 
 ```bash
