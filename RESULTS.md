@@ -730,6 +730,32 @@ given the small (325k) adapter distilling to the same teacher. Peak VRAM
 environment difference, both within T4). The ≥2/3 needle criterion is already
 met with 2/2; Run 9 (seed 2) completes the pre-registered set.
 
+**§22c — Run 9 (seed 2, Colab T4, 2026-07-21): PASS. Multi-seed set COMPLETE.**
+PPL 7.96 → **8.84 (1.111×)**, needle **4/4**.
+
+Three-seed summary of the 6-layer reference recipe (GRAFT_N=6, layers
+[3,7,11,15,19,23], decay_mode=exp, cross-chunk distance curriculum):
+
+| Seed | Run | PPL (orig 7.96 →) | ratio | needle 512/2048/8192/16384 |
+|------|-----|-------------------|-------|----------------------------|
+| 0 | Run 7 | 8.84 | 1.112× | 4/4 |
+| 1 | Run 8 | 8.84 | 1.111× | 4/4 |
+| 2 | Run 9 | 8.84 | 1.111× | 4/4 |
+
+**Verdict (pre-registered §22a criteria — MET).** needle ≥2/3 seeds at all four
+lengths: **3/3** (12/12 total). PPL within 8.6–9.1: **3/3**. The recipe replicates
+across three independent seeds. The near-identical PPL across seeds is expected
+for a 325k-param adapter distilling to a fixed frozen teacher on a fixed corpus —
+the optimization landscape is narrow — and is itself evidence of a stable, not
+lucky, result. Stage-1 for the 6-layer recipe is also ~4× cheaper than the
+13-layer version (MSE 0.081→0.043 in 14 min vs ~1 h; fewer layers to match).
+
+This closes the multi-seed replication line. The headline is now defensible:
+*a 6-layer O(1)-memory graft of Qwen2.5-1.5B (325k trainable params, ~0.03%)
+reaches 1.11× base perplexity while passing needle-in-haystack retrieval at
+512–16384 tokens with out-of-training-vocabulary secrets — reproduced across
+three seeds, trained on free-tier T4.*
+
 ## Reproduction
 
 ```bash

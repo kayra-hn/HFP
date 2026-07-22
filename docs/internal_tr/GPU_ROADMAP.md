@@ -180,6 +180,7 @@ Sürücünün kapsadığı hücreler, amaç ve başarı kriterleri:
 - [x] GitHub README reçete + GLA konumlandırması hizalandı. Kalan: HF model card (K3 sonrası).
 - [ ] K1 yeniden koşumu: eş-hedef (FIX M1) + pencereli O(1) config + 3 seed — Ek 21 sonrası zorunlu.
 - [x] Karar: cubic_flux kazandı mı? → **DOĞRULANDI** (uzun-ufuk karar deneyi: cubic+dpfp 63.9% vs exp+dpfp 20.7%, >4 SE, her iki kolda LR taramalı; RESULTS §6 / DENEY_SONUCLARI Ek 16. WikiText-2'de de en iyi reçetenin parçası: cubic+additive+dpfp PPL 183.6, RESULTS §10).
+- [x] **Graft çok-seed replikasyon TAMAMLANDI (2026-07-23):** 6-katman referans reçetesi (GRAFT_N=6, exp) 3/3 seed'de geçti — PPL 1.111-1.112×, needle 12/12 (512/2048/8192/16384, eğitim-dışı sözcük). RESULTS §22a/§22b/§22c. Ön-kayıtlı ≥2/3 kriteri karşılandı. Not: bu graft hattında yasa-kıyası (§15h) exp≈cubic; §0/§18'deki cubic zaferi küçük-ölçek sentetik + WikiText-2 rejimine ait, graft rejimine genellenmez — README zaten exp'i pragmatik varsayılan olarak belgeliyor.
 
 ---
 

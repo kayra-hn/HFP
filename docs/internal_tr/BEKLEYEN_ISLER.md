@@ -30,8 +30,9 @@
 7. **Eğitilmiş-çift girişimi anomalisi:** "copper mountain" @512 ıskalarken
    temiz kelimeler 9/9 (§15h yan gözlem). Ucuz teşhis: eğitim-kelimeli T5
    mini-ızgarası.
-8. **[KOŞUYA HAZIR — Run 8/9]** Çok-seed replikasyon — hedef 6-katman reçetesi
-   (GRAFT_N=6, RUN_SEED=1/2; Run 7 = seed 0). Değişiklik gerekçesi §22a'da deklare.
+8. **[TAMAM — 2026-07-23]** Çok-seed replikasyon TAMAMLANDI (§22b/§22c):
+   3/3 seed geçti, PPL 1.111-1.112×, needle 12/12. Ön-kayıtlı ≥2/3 kriteri
+   karşılandı. 6-katman referans reçetesi çok-seed onaylı.
 
 ## Repo / yayın hijyeni
 
