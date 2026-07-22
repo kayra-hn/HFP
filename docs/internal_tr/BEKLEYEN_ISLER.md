@@ -23,15 +23,15 @@
 
 ## Graft hattı — açık teknik işler
 
-5. **[KOŞUYA HAZIR — Run 7]** PPL 1.6× uçurumu: graft yoğunluğu (13→6 katman).
-   Ön-kayıt RESULTS §22; notebook parametreli (GRAFT_N=6, RUN_SEED=0).
+5. **[TAMAM — 2026-07-21]** PPL uçurumu ÇÖZÜLDÜ (§22a): 6-katman graft →
+   PPL 1.112×, needle 4/4 (2048 dahil). Yeni referans reçete: GRAFT_N=6.
 6. **exp'in 2048-erken deliği (0/3) + cubic'in 4096 çukuru:** güvenilirlik
    mühendisliği — müfredat yoğunluğu/karışım oranı taraması.
 7. **Eğitilmiş-çift girişimi anomalisi:** "copper mountain" @512 ıskalarken
    temiz kelimeler 9/9 (§15h yan gözlem). Ucuz teşhis: eğitim-kelimeli T5
    mini-ızgarası.
-8. **[KOŞUYA HAZIR — Run 8/9]** Çok-seed graft replikasyonu: seeds 1,2
-   (Run 6 = seed 0). Ön-kayıt RESULTS §22 (GRAFT_N=13, RUN_SEED=1/2).
+8. **[KOŞUYA HAZIR — Run 8/9]** Çok-seed replikasyon — hedef 6-katman reçetesi
+   (GRAFT_N=6, RUN_SEED=1/2; Run 7 = seed 0). Değişiklik gerekçesi §22a'da deklare.
 
 ## Repo / yayın hijyeni
 

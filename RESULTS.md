@@ -706,6 +706,22 @@ Criteria: headline claim survives if needle @512/8192/16384 is FOUND in ≥2/3
 seeds and PPL stays in the 12.7-13.1 band; any seed diverging materially is
 reported as-is.
 
+**§22a — Run 7 result (2026-07-21): PASS, decisively.** 6-layer graft
+(layers [3,7,11,15,19,23], exp, seed 0, distance-curriculum S2, single
+session): PPL 7.96 → **8.84 (1.112×)** — from 1.6× at 13 layers, meeting the
+pre-registered ≤1.2× PASS bar (the original ≤1.05× product criterion is now
+within sight); needle **FOUND at all four lengths 512/2048/8192/16384** with
+out-of-training vocabulary — including 2048, the weak cell of *both* 13-layer
+laws (§15g/§15h). Peak VRAM 9.28 GB. **Conclusion: the LM-quality cost is
+density-driven** — halving the graft recovers most of the quality while
+retrieval strengthens rather than degrades. The balanced 6-layer hybrid is the
+project's current best artifact and the new reference recipe.
+**Amendment to the §22 plan (declared before running 8-9):** multi-seed
+replication will target the **6-layer recipe** (GRAFT_N=6, seeds 1-2, Run 7 =
+seed 0) instead of the originally listed 13-layer config, since the headline
+claim now attaches to the 6-layer artifact. Criteria adapted accordingly:
+needle @512/2048/8192/16384 FOUND in ≥2/3 seeds; PPL within 8.6-9.1.
+
 ## Reproduction
 
 ```bash
