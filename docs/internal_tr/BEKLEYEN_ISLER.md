@@ -57,10 +57,15 @@
     (odd-13 1.6× ile ~aynı, hatta biraz kötü), needle 1/4. Sonuç: (a) NMSE PPL'e
     TRANSFER ETMİYOR; (b) §22a uçurumu seçim artefaktı DEĞİL, yoğunluk 13'te
     gerçek. "Akıllı seçim" kaldıracı KAPANDI. Detay RESULTS §24a.
-18. **[YENİ — density-curriculum] Trainability vs kapasite ayrımı:** 6 katman
-    graft+eğit → dondur → kademeli +katman ekle. 13'ün uçurumu eğitim güçlüğü mü
-    (curriculum kırar) yoksa temel kapasite mi? Alternatif kaldıraçlar: delta/gated
-    yazım (grafting.py §5 hazır), daha büyük O(1) state (key_dim/bulk_dim).
+18. **[KISMEN — stabilizasyon KAPANDI] 13-kat uçurum teşhisi:** stabilize S2
+    (LR 1e-4, warmup 150, 900) → 1.795× (kötüleşti); üç 13-kat config 1.6-1.8×
+    (§24c). Uçurum SAĞLAM. Teşhis: S1 per-kat MSE ~0.089 (iyi) ama uçtan-uca 1.8×
+    → sorun **birikimli hata** (compounding), per-kat kapasite değil. Kapanan
+    kaldıraçlar: seçim (§24a) + stabilizasyon (§24c). Açık (daha zor/opsiyonel):
+    (a) GERÇEK incremental curriculum (6 eğit→dondur→gruplar hâlinde ekle;
+    compounding'e doğrudan saldırır), (b) daha güçlü primitif (delta/gated),
+    (c) daha büyük state. NOT: §23 maliyet-hendeği derinleştirme HENÜZ çözülmedi;
+    ürün/moat çerçevesinde varsayılmamalı.
 
 ## Ufukta (karar gerektirir)
 

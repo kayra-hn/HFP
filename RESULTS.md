@@ -916,6 +916,41 @@ the wall is capacity/expressivity, and pushing density via training is depriorit
 One-shot, honestly reported whichever way it lands. Checkpoint lineage tagged
 `g13mapgS` (distinct from Faz-B's `g13mapg`, no resume collision).
 
+**§24c — §18 probe outcome: stabilization did NOT help → outcome (b), and a
+mechanistic clue.** Stabilized guarded-13 (LR 1e-4, warmup 150, 900 steps) →
+**PPL 14.28 = 1.795×**, marginally *worse* than Faz-B's 1.70×; needle 1/4; the S2
+total-loss still oscillated (39–164). Pre-registered verdict (b): the 13-layer
+cliff is **not** a simple training-stability artifact. Three disjoint 13-layer
+configurations now agree — odd-13 joint (1.6×), guarded-13 joint (1.70×),
+guarded-13 stabilized (1.795×) — so the **6→13 density wall is robust** for this
+additive/hybrid linear primitive, independent of layer selection and of LR/warmup/
+length tuning.
+
+**The mechanistic clue (important):** Stage-1 converged *fine* even at 13 layers —
+per-layer MSE fell to ~0.089, the same neighborhood as the 6-layer runs. So each
+grafted layer reconstructs its teacher well **in isolation, on clean input**. Yet
+end-to-end PPL is 1.8×. The failure is therefore not per-layer capacity but
+**compounding**: in the true forward, each O(1) layer's small reconstruction error
+feeds the next, and across 13 grafted layers the errors accumulate. This also
+explains §24's finding that NMSE (single-layer, clean-input) does not predict PPL
+(multi-layer composition) — they measure different regimes, and the wall lives in
+the composition. (Caveat on the "oscillation": the 39–164 swings are dominated by
+the cross-chunk-recall batches' KL term, not necessarily core-LM divergence — the
+`lm` loss stayed ~3–4 — so "instability" overstates it; the real story is
+compounding, not divergence.)
+
+**What is now closed vs open.** Closed as density levers: (1) layer *selection*
+(§24a), (2) training *stabilization* (§24c). The compounding diagnosis means the
+one still-untested targeted intervention is a **true incremental curriculum**
+(graft 6, train, freeze, add layers in small groups) — it attacks compounding
+directly by never optimizing all 13 error sources jointly — plus, more
+speculatively, a **stronger O(1) primitive** or **larger state**. But three spent
+runs have robustly established the wall; the 6-layer recipe (1.11×, 3 seeds, §22)
+stands as the practical ceiling for now. Deepening the §23 cost-moat via higher
+density is a genuine, not-yet-cracked research problem — it must not be assumed in
+any product/moat framing. BEKLEYEN #18 updated: stabilization closed; incremental
+curriculum / bigger-state remain as harder, optional bets.
+
 ## Reproduction
 
 ```bash
