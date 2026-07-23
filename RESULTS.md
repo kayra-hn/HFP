@@ -756,6 +756,60 @@ reaches 1.11× base perplexity while passing needle-in-haystack retrieval at
 512–16384 tokens with out-of-training-vocabulary secrets — reproduced across
 three seeds, trained on free-tier T4.*
 
+## 23. On-device VRAM / latency showcase (hybrid vs full KV-cache)
+
+Structural benchmark (checkpoint-independent — depends only on tensor shapes,
+dtype, compute pattern, not trained values) of the 6-layer reference recipe vs
+stock Qwen2.5-1.5B, on a Colab T4, fp16, chunked prefill (512), 32-token decode.
+Context 4k→128k. Script: `notebooks/bench_vram_latency_v14.ipynb`.
+
+| context | peak VRAM base→hybrid | VRAM save | decode base→hybrid | latency save |
+|---------|-----------------------|-----------|--------------------|--------------|
+| 4 096   | 3.53 → 3.61 GB | −2.3% | 43.2 → 44.0 ms/tok | −1.9% |
+| 8 192   | 3.66 → 3.70 GB | −1.3% | 69.9 → 60.6 ms/tok | +13% |
+| 16 384  | 4.06 → 3.99 GB | +1.8% | 122.4 → 102.0 ms/tok | +17% |
+| 32 768  | 4.87 → 4.69 GB | +3.5% | 228.0 → 183.8 ms/tok | +19% |
+| 65 536  | 6.48 → 6.10 GB | +5.8% | 438.6 → 350.1 ms/tok | +20% |
+| 131 072 | 9.70 → 8.93 GB | +8.0% | 857.1 → 680.3 ms/tok | +21% |
+
+**Reading (honest).**
+
+*Memory.* Savings grow monotonically with context: at 4k the hybrid is slightly
+*worse* (HFP params/state overhead dominates when there is almost no KV to save),
+crosses over around 16k, and reaches +8.0% at 128k. This is smaller than the
+naive "6/28 = 21%" figure because 21% is the saving on the *KV component only*;
+total VRAM is dominated by the 3.1 GB fp16 weights. At 128k, baseline KV ≈ 3.76 GB
+of 9.70 GB total; 21% of 3.76 = 0.79 GB = 8.1% of total — matching the measured
+8.0% almost exactly. The internal consistency is itself the validation.
+
+*Latency* is the stronger win: decode work per token scales with the number of
+cached (full-attention) layers, so linearizing 6/28 of them cuts ~21% of
+per-token attention cost at 128k (857 → 680 ms/tok). At 4k it is a wash.
+
+*The O(1) signature (headline visual).* The state carried by the 6 grafted layers
+is **9.5 MB, flat at every context length**. The KV those same 6 layers *would*
+have used grows linearly: 6/28 × 3.76 GB ≈ 805 MB at 128k. So on the grafted
+portion the recipe replaces 805 MB (growing) with 9.5 MB (constant) — an ~85×
+reduction that does not grow with context. The panel-3 plot (flat line vs rising
+line) is the concrete picture of the on-device vision; the modest *total* saving
+is simply because 22/28 layers still use full KV.
+
+**Honesty note on the direct check.** The benchmark also tries to read the number
+of layers actually stored in the `DynamicCache`; on this transformers version the
+API read returned a sentinel (−1), so the direct "22 cached layers" assertion did
+**not** execute. The grafted-layers-skip-KV property is therefore confirmed only
+*indirectly* here — the measured total saving matches the analytic prediction that
+holds **only if** grafted layers write no KV (if they did, the hybrid would equal
+baseline, 0% saving). The notebook has since been fixed to read the cache across
+API variants; a future run will report the direct count. Numbers above are
+unaffected (VRAM/latency are measured directly).
+
+**Frame.** Savings are proportional to graft density (6/28). Higher density
+approaches the O(1) asymptote but pays perplexity (the §22a cliff: 13 layers →
+1.6× PPL). This benchmark is the Pareto point of the *current* recipe, not a
+ceiling. Pairing it with §22: at 6 layers you buy 1.11× PPL (3/3 seeds) and, at
+128k, ~21% faster decode with an O(1) memory footprint on the grafted layers.
+
 ## Reproduction
 
 ```bash

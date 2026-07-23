@@ -51,7 +51,11 @@
 13. Makale yeniden konumlandırma: "cross-chunk distilasyonla O(1) graft +
     retention-yasası ablasyonu" ana hikâye; §6/Görev C sonucu eklenince taslak
     (`docs/paper3_ml_architecture.tex`) revize.
-14. Cihaz-içi vitrin ölçümü: 16k-128k bağlamda VRAM/latency eğrisi
-    (hibrit vs saf KV-cache) — vizyonun somut grafiği.
+14. **[TAMAM — 2026-07-23]** Cihaz-içi vitrin ölçümü YAPILDI (RESULTS §23):
+    4k-128k, hibrit vs saf KV-cache. 128k'da VRAM %8 tasarruf, decode ~%21
+    hızlanma, graft state 9.5 MB SABIT (grafted katmanlarda ~85× O(1) bellek).
+    `notebooks/bench_vram_latency_v14.ipynb`, grafik `docs/assets/`.
+    Açık kalan: DynamicCache doğrudan katman-sayımı (-1 döndü, notebook
+    düzeltildi; bir sonraki koşuda doğrudan teyit gelecek).
 15. GLA baseline'ının NaN'ı: in-house wrapper'daki kararsızlığın kökü
     (adil kıyas hijyeni; düşük öncelik).
