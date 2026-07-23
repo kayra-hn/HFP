@@ -903,6 +903,19 @@ long context per §23 math. The 6-layer recipe (1.11×, 3 seeds, §22) remains t
 shipping reference; pushing past it is now a known *research* problem, not a
 selection tweak. BEKLEYEN #16/#17 closed; #18 (density-curriculum) opened.
 
+**§24b — pre-registered (written before the run): §18 first probe = training
+stabilization.** Motivation: Faz-B's S2 loss oscillated wildly (30–155) vs the
+smooth 6-layer runs — a signature of optimization instability, not necessarily a
+capacity floor. Cheapest discriminator before building a full curriculum: re-run
+the *same* guarded-13 layers with a stabilized S2 (LR 3e-4→1e-4, warmup 50→150,
+steps 600→900), everything else identical. Pre-registered criteria: (a) stabilized
+guarded-13 PPL drops **materially below 1.6×** (≤ ~1.35×) → the cliff is largely a
+*trainability* artifact; density-via-training (curriculum/warm-start, larger state)
+is worth pursuing. (b) PPL stays **≥ ~1.55×** → not a training-stability artifact;
+the wall is capacity/expressivity, and pushing density via training is deprioritized.
+One-shot, honestly reported whichever way it lands. Checkpoint lineage tagged
+`g13mapgS` (distinct from Faz-B's `g13mapg`, no resume collision).
+
 ## Reproduction
 
 ```bash
