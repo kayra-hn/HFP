@@ -951,6 +951,38 @@ density is a genuine, not-yet-cracked research problem — it must not be assume
 any product/moat framing. BEKLEYEN #18 updated: stabilization closed; incremental
 curriculum / bigger-state remain as harder, optional bets.
 
+## 25. Root-cause fix attempt — student-forward distillation (exposure bias)
+
+Pre-registered (written before the run). §24c diagnosed the 13-layer wall as
+**compounding**: Stage-1 trains each grafted layer on *clean teacher* input
+(teacher_forcing propagates teacher output), but at inference each layer receives
+the *corrupted student* output of the layer before it. Classic **exposure bias** —
+layers are never trained on the input distribution they actually face, so small
+per-layer errors accumulate through the stack. Every earlier lever (selection,
+stabilization) was a downstream patch; this attacks the root.
+
+**Method (new training mode `student_forcing` added to `grafting.py`,
+backward-compatible).** Identical to teacher_forcing except it propagates the
+**student** output forward (detached) instead of the teacher's. Each grafted
+layer's MSE target is still teacher(current-input), but "current-input" is now the
+realistic student-produced (corrupted) hidden state — so the layer learns to
+*absorb upstream error*. The `.detach()` cuts the cross-layer graph, preserving the
+cheap per-layer immediate-backward (memory stays as in §24c). Schedule (scheduled-
+sampling / DAgger style, to avoid early instability): first 40% of Stage-1 in
+teacher_forcing (clean warm-up), then switch to student_forcing.
+
+**Single variable vs §24c.** Same guarded-13 layers, same stabilized S2 — the only
+change is Stage-1 distribution (clean→realistic). Checkpoint lineage `g13mapgSF`.
+
+**Pre-registered criteria.** (a) PPL drops **materially below §24c's 1.795×**, ideally
+below Faz-B's 1.70× toward ~1.3× → exposure bias was a dominant driver of
+compounding; the fundamental fix works and the density line **reopens** (next:
+apply to a fresh recipe, push K past 13). (b) PPL stays **~1.6–1.8×** → exposure
+bias is not the dominant driver; the wall is deeper (softmax-vs-linear expressivity),
+and density-via-more-layers is closed for this primitive — the honest ceiling is
+~6 layers. One-shot, reported whichever way it lands. Secondary read: needle recall
+(§24c gave 1/4) — a real fix should also recover retrieval.
+
 ## Reproduction
 
 ```bash

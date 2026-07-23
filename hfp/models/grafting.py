@@ -341,7 +341,7 @@ class HFPGraftAttention(nn.Module):
     def forward(self, hidden_states, attention_mask=None, position_ids=None,
                 past_key_value=None, output_attentions=False, use_cache=False,
                 cache_position=None, position_embeddings=None, **kwargs):
-        need_teacher = self.mode in ("teacher_forcing", "teacher")
+        need_teacher = self.mode in ("teacher_forcing", "teacher", "student_forcing")
         t_out = None
         if need_teacher:
             with torch.no_grad():
@@ -357,8 +357,14 @@ class HFPGraftAttention(nn.Module):
             out = t_out
         else:
             s_out = self._student_forward(hidden_states)
-            if self.mode == "teacher_forcing":
-                # Stage 1: katman-ici MSE hedefi; ileri OGRETMEN ciktisi gider
+            if self.mode in ("teacher_forcing", "student_forcing"):
+                # Stage 1 distilasyon: katman-ici MSE hedefi = teacher(bu-katmanin-girdisi).
+                #   teacher_forcing: ileri OGRETMEN ciktisi gider -> katmanlar bagimsiz, hepsi
+                #     TEMIZ ogretmen girdisi gorur (ama cikarimda BOZUK girdi gelir = exposure bias).
+                #   student_forcing [§25]: ileri OGRENCI ciktisi (detach) gider -> her katman
+                #     cikarimda gorecegi GERCEK (student-uretimi, bozuk) girdi dagilimini gorur
+                #     ve ustundeki hatayi sogurmayi ogrenir = compounding'in KOK cozumu.
+                #     detach: katman-arasi graf kesilir -> ucuz per-katman backward korunur.
                 l = F.mse_loss(s_out, t_out)
                 if (self.distill_backward_scale is not None and self.training
                         and torch.is_grad_enabled()):
@@ -366,7 +372,7 @@ class HFPGraftAttention(nn.Module):
                     self.last_distill_loss = l.detach()
                 else:
                     self.last_distill_loss = l
-                out = t_out
+                out = t_out if self.mode == "teacher_forcing" else s_out.detach()
             else:
                 out = s_out
 
@@ -430,7 +436,7 @@ def set_distill_backward(model, scale: Optional[float]):
 
 
 def set_graft_mode(model, mode: str):
-    assert mode in ("student", "teacher_forcing", "teacher")
+    assert mode in ("student", "teacher_forcing", "teacher", "student_forcing")
     for m in model.modules():
         if isinstance(m, HFPGraftAttention):
             m.mode = mode
