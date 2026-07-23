@@ -810,6 +810,65 @@ approaches the O(1) asymptote but pays perplexity (the §22a cliff: 13 layers �
 ceiling. Pairing it with §22: at 6 layers you buy 1.11× PPL (3/3 seeds) and, at
 128k, ~21% faster decode with an O(1) memory footprint on the grafted layers.
 
+## 24. Per-layer linearization-cost map (Faz-A) — and what it revealed about the proxy
+
+Grafted all 28 layers, Stage-1 teacher-forcing (independent per-layer targets),
+read each layer's converged normalized MSE (NMSE = ‖student−teacher‖²/‖teacher‖²)
+on 24 held-out WT-2 chunks. Script: `notebooks/layer_linearization_probe_v1.ipynb`.
+Map (cheapest→most expensive, selected values):
+
+```
+cheapest:  L27 0.19  L26 0.28  L21 0.32  L25 0.46  L24 0.53  L23 0.71 ...
+expensive: ... L9 1.67  L12 1.57  L6 2.02  L4 2.06  L2 2.30  L3 2.32
+```
+
+Full map + trajectories: `docs/assets/layer_linearization_map.json/.png`.
+
+**Pre-registered verdicts — read honestly, both are informative:**
+
+*H1 (selection headroom): the proxy says YES, but our own data warns against
+trusting it.* Cheapest-6 mean NMSE 0.42 vs the reference set [3,7,11,15,19,23]
+1.21 — reference is 66% "more expensive" by NMSE. Taken alone this says naive
+odd-indexing left large headroom. **But the critical internal check:** that same
+reference-6 — which by this map contains the single *worst* layer (L3, NMSE 2.32,
+rank 28/28) and several mid-expensive ones — already delivers **1.11× PPL across
+3 seeds** (§22). A set full of "hard-to-reconstruct" layers gives near-baseline
+PPL. So low NMSE is demonstrably **not necessary** for good PPL, and the NMSE→PPL
+link is loose. H1's headroom is a hypothesis the proxy raises; it is **not**
+evidence that principled selection will lower PPL. Only Faz-B (real PPL) can say.
+
+*H2 (are first/last layers expensive, per the Mamba-in-Llama keep-them-full
+prior?): NO — and this is the pre-registered caveat manifesting, not a broken
+metric.* The last layer (L27) is the **cheapest** (0.19); L0 is mid (rank 10).
+This contradicts the keep-boundaries prior. Honest interpretation: that prior is
+about **downstream PPL sensitivity**, whereas NMSE measures **single-layer
+reconstruction difficulty** — two different axes. They diverge most sharply at
+the boundary: the last layer's output feeds the final norm + LM head **directly**,
+so a given reconstruction error there hits the logits with no downstream layers to
+absorb/correct it, while a middle layer's error is reprocessed by many layers
+after it. So L27 can be *easy to reconstruct* (low NMSE) yet *PPL-critical* (high
+sensitivity) simultaneously. H2's "failure" therefore corroborates the
+pre-registered limitation (NMSE ≠ PPL-sensitivity) rather than invalidating the
+run.
+
+**Net finding (the real value of Faz-A):** the map is informative, but the run's
+most important result is a *methodological* one — **NMSE is a weak predictor of
+PPL for this problem** (a "bad-NMSE" set already achieves 1.11×; boundary layers
+invert the expected ranking). This means we cannot shortcut density decisions with
+the cheap proxy; Faz-B must measure PPL directly, and its outcome is genuinely
+uncertain. Faz-A did its job: it ranked candidates *and* told us how much to
+trust the ranking (not much, on its own).
+
+**Faz-B design (updated by Faz-A):** graft a principled-13 and measure real PPL
+vs the §22a odd-13 cliff (1.6×). Given H2, guard the boundary layers (exclude L0,
+L27) → guarded-cheapest-13 = [11,13,15,16,17,18,20,21,22,23,24,25,26], mean NMSE
+~0.71 vs odd-13's 1.07. Same recipe/seed/count — the only variable is *which* 13.
+Outcome interpretation, pre-registered: (a) guarded-13 materially < 1.6×
+(toward ~1.2×) → principled selection unlocks higher density, proxy transfers
+enough to be useful; (b) guarded-13 ≈ 1.6× → 13 layers is costly regardless of
+selection (capacity wall, not selection), and NMSE does not transfer — a
+different signal (direct per-layer PPL-delta) would be needed.
+
 ## Reproduction
 
 ```bash
