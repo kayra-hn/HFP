@@ -869,6 +869,40 @@ enough to be useful; (b) guarded-13 ≈ 1.6× → 13 layers is costly regardless
 selection (capacity wall, not selection), and NMSE does not transfer — a
 different signal (direct per-layer PPL-delta) would be needed.
 
+**§24a — Faz-B outcome (guarded-cheapest-13, seed 0, full S1+S2): outcome (b),
+a clean NEGATIVE.** Principled selection [11,13,15,16,17,18,20,21,22,23,24,25,26]
+(mean NMSE 0.71) → **PPL 13.50 = 1.697× base** — essentially the same as, in fact
+marginally *worse* than, the naive odd-13 cliff (1.6×), despite having far lower
+NMSE (0.71 vs 1.07). Needle also degraded (1/4 vs the 6-layer recipe's 4/4). Two
+conclusions, both important:
+
+1. **NMSE does not transfer to PPL — confirmed decisively.** A 34%-lower-NMSE
+   layer set produced *worse* PPL. The cheap single-layer reconstruction proxy is
+   not just weak but effectively non-predictive (near-zero, possibly inverted, at
+   the set level) for this problem. Faz-A's map should not be used to guide density
+   selection. This vindicates running Faz-B instead of trusting the proxy.
+
+2. **The §22a cliff is not a selection artifact — it is real at density 13 under
+   this recipe.** Two disjoint 13-layer selections (naive odd, principled-cheapest)
+   both land at ~1.6–1.7×. So "pick better layers" is **ruled out** as the lever
+   for pushing graft density. Honest caveat: the S2 loss for the 13-layer run was
+   noticeably noisier (30–155, non-smooth) than the well-behaved 6-layer runs, and
+   the recipe (LR, steps, out_gain, curriculum) was tuned for 6 layers — so this
+   rules out *selection*, but does not fully separate a fundamental capacity wall
+   from a trainability wall specific to higher density. That separation is the next
+   question.
+
+**Consequence for the density-push line (RESULTS §23 Pareto / cost-moat).** The
+cheapest lever (smart layer selection) is now closed. Deepening the moat beyond
+the 6-layer point requires a *harder* lever, in rough order of promise: (i) a
+density-specific / curriculum training recipe (graft 6, freeze, add layers
+incrementally) to test the trainability-vs-capacity question; (ii) a stronger O(1)
+primitive (delta/gated write instead of additive; §5 of grafting.py already
+supports hybrid); (iii) larger O(1) state capacity (key_dim/bulk_dim) — cheap at
+long context per §23 math. The 6-layer recipe (1.11×, 3 seeds, §22) remains the
+shipping reference; pushing past it is now a known *research* problem, not a
+selection tweak. BEKLEYEN #16/#17 closed; #18 (density-curriculum) opened.
+
 ## Reproduction
 
 ```bash

@@ -53,9 +53,14 @@
     Stage-1 teacher_forcing, per-katman NMSE oku (bağımsız, tek koşu). Çıktı:
     ucuz/pahalı katman sıralaması → ilkeli seçim. Ön-kayıtlı H1 (seçim
     manevrası ≥%20?), H2 (ilk/son pahalı mı?). PROXY — Faz-B ile doğrulanır.
-17. **[Faz-B, #16 sonrası] En-ucuz-K PPL doğrulaması:** #16'nın en-ucuz-13'ünü
-    graft'la → tam Stage-1+2 → PPL'i §22a odd-13 (1.6×) ile kıyasla. Proxy
-    gerçek PPL'i öngörüyor mu? Öngörüyorsa yoğunluğu 6→12-16'ya çıkarma yolu açık.
+17. **[TAMAM — 2026-07-23, NEGATİF] Faz-B:** guarded-cheapest-13 → PPL 1.697×
+    (odd-13 1.6× ile ~aynı, hatta biraz kötü), needle 1/4. Sonuç: (a) NMSE PPL'e
+    TRANSFER ETMİYOR; (b) §22a uçurumu seçim artefaktı DEĞİL, yoğunluk 13'te
+    gerçek. "Akıllı seçim" kaldıracı KAPANDI. Detay RESULTS §24a.
+18. **[YENİ — density-curriculum] Trainability vs kapasite ayrımı:** 6 katman
+    graft+eğit → dondur → kademeli +katman ekle. 13'ün uçurumu eğitim güçlüğü mü
+    (curriculum kırar) yoksa temel kapasite mi? Alternatif kaldıraçlar: delta/gated
+    yazım (grafting.py §5 hazır), daha büyük O(1) state (key_dim/bulk_dim).
 
 ## Ufukta (karar gerektirir)
 
