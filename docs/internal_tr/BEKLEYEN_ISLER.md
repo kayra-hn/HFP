@@ -46,6 +46,17 @@
 12. **Lisans Kapı-2:** HF'ye ağırlık yüklemeden önce
     `LISANS_KARAR_REHBERI.md` checklist'i (ağırlık lisansı + Qwen atfı).
 
+## Yoğunluk-itme hattı (RESULTS §23 Pareto'sunu ilerletmek)
+
+16. **[KOŞUYA HAZIR — Faz-A] Katman-başı linearize maliyeti haritası:**
+    `notebooks/layer_linearization_probe_v1.ipynb`. Tüm 28 katmanı graft'la,
+    Stage-1 teacher_forcing, per-katman NMSE oku (bağımsız, tek koşu). Çıktı:
+    ucuz/pahalı katman sıralaması → ilkeli seçim. Ön-kayıtlı H1 (seçim
+    manevrası ≥%20?), H2 (ilk/son pahalı mı?). PROXY — Faz-B ile doğrulanır.
+17. **[Faz-B, #16 sonrası] En-ucuz-K PPL doğrulaması:** #16'nın en-ucuz-13'ünü
+    graft'la → tam Stage-1+2 → PPL'i §22a odd-13 (1.6×) ile kıyasla. Proxy
+    gerçek PPL'i öngörüyor mu? Öngörüyorsa yoğunluğu 6→12-16'ya çıkarma yolu açık.
+
 ## Ufukta (karar gerektirir)
 
 13. Makale yeniden konumlandırma: "cross-chunk distilasyonla O(1) graft +
