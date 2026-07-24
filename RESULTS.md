@@ -1016,6 +1016,35 @@ one run — after which the density line closes cleanly regardless of outcome, a
 effort returns to the 6-layer product path. BEKLEYEN #18 updated. §23 cost-moat
 deepening remains unsolved and must not be assumed in any product framing.
 
+## 26. Cubic in its native regime — extrapolation test (pre-registered)
+
+Written before the run. §15h found cubic ≈ exp in the *graft-onto-Qwen* regime
+(dense, saturated writes — cubic's worst case). But §6 documented a real,
+statistically strong cubic win (63.9% vs 20.7%, >4 SE) in a *small-scale
+long-horizon* regime. The reconciliation (technical note): cubic's decay
+λ = 1/√(1+2η z²) adapts to **current channel occupancy** — empty/sparse channels
+≈ no forgetting (plateau), saturated channels self-limit — whereas exp's per-channel
+λ is fixed regardless of occupancy. So cubic's edge should appear precisely where
+(a) writes are sparse (channels stay unsaturated) and (b) the recall horizon
+**exceeds the trained horizon**, where exp's learned timescales run out but cubic's
+content-adaptive plateau keeps protecting the target channel. That regime — sparse,
+long-lived memory — is also the on-device personal-memory regime, so this is not
+just a curiosity.
+
+**Design.** Vehicle = the debugged cross-chunk carry pipeline (`carry_curriculum.py`
+trains carry to CARRY_MAX=16 chunks; `matched_probe.py` evaluates on the
+train-distribution probe at K = 0,2,8,16,32,64). Twin runs exp vs
+cubic_flux_chunked, 3 seeds each, identical everything else (multi-scale learned
+λ for exp = the fair control). The discriminating signal is **extrapolation**:
+K=32 and K=64 are 2× and 4× the trained horizon.
+
+**Pre-registered criteria.** (a) **Cubic niche CONFIRMED** if at *both* K=32 and
+K=64 the seed-averaged matched accuracy is ≥ +10 points over exp AND the seed
+ranges separate (min_cubic > max_exp). (b) Symmetric: same threshold the other way
+→ exp wins even here. (c) Otherwise → **null**: cubic has no advantage even in its
+predicted home regime, and exp is the honest default everywhere (cubic retired to
+a flag). Reported whichever way it lands; this is cubic's fair day in its own court.
+
 ## Reproduction
 
 ```bash
