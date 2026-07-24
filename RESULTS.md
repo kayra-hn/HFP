@@ -1045,6 +1045,48 @@ ranges separate (min_cubic > max_exp). (b) Symmetric: same threshold the other w
 predicted home regime, and exp is the honest default everywhere (cubic retired to
 a flag). Reported whichever way it lands; this is cubic's fair day in its own court.
 
+**§26a — outcome: INCONCLUSIVE (vehicle failure), not a null. Plus one strong
+incidental signal.** Matched-probe accuracy (chance 3.3%), seed mean [min–max]:
+
+| K | ~gap | exp | cubic | Δ |
+|---|------|-----|-------|---|
+| 0 | 256 | **18.7%** [6–36] | **43.3%** [36–56] | **+24.7** |
+| 2 | 768 | 7.3% [2–12] | 8.0% [8–8] | +0.7 |
+| 8 | 2 304 | 4.7% [2–8] | 6.7% [4–10] | +2.0 |
+| 16 | 4 352 | 4.0% [2–6] | 4.7% [4–6] | +0.7 |
+| 32 | 8 448 | 3.3% [0–6] | 4.7% [4–6] | +1.3 |
+| 64 | 16 640 | 3.3% [2–6] | 5.3% [2–8] | +2.0 |
+
+**Why this is not a verdict on cubic.** At every K ≥ 2 *both* arms sit at chance.
+The carry vehicle never learned to hold the target past a couple of boundaries —
+the same first-boundary collapse that caused the small-scale lifetime line to be
+parked (§20/§21). A comparison in which both arms are at chance has **no power**:
+it cannot distinguish "cubic has no niche" from "the test could not detect one."
+Recording this as a null would misreport a zero-sensitivity experiment. §26's
+pre-registered criteria are therefore **not evaluable**; the question stays open.
+
+**The incidental signal (hypothesis-generating, NOT confirmation).** At K=0 — the
+one distance where the vehicle has real signal (single chunk hand-off, ~256 tokens,
+both arms clearly above chance) — cubic scores **43.3% vs exp's 18.7%, +24.7
+points, and cubic wins in every seed** (cubic 36/38/56 vs exp 36/14/6). Honest
+caveats, stated plainly: (i) K=0 was **not** a pre-registered test point, so this
+is post-hoc; (ii) the seed ranges only *touch* (min cubic 36 = max exp 36) rather
+than separate, so it fails the strict separation bar §26 demanded elsewhere;
+(iii) n=3, 50 trials. It is a lead, not a result. But it is a *coherent* lead: it
+sits exactly where cubic's mechanism predicts an edge (a sparsely-written channel
+surviving a hand-off) and it aligns with the user's original observation and with
+§6's confirmed win — i.e. cubic keeps showing an advantage wherever a retention
+signal actually exists, and shows nothing wherever there is no signal at all.
+
+**Consequence.** Cubic is *still* neither confirmed nor refuted in its predicted
+home regime. Two honest options: (a) cheap, sharp follow-up at the distances where
+the vehicle does work (K ∈ {0,1}, more seeds, more trials) to test whether the
++24.7 hand-off advantage is real — this is a well-posed, powered question; or
+(b) fix the parked carry vehicle first (§20/§21), which is the harder, longer road.
+Until one of these lands, `exp` remains the pragmatic default in the shipped graft
+recipe (§15h, where it *was* properly powered and tied), and cubic remains a
+supported flag with one confirmed win (§6) and one open lead (this section).
+
 ## Reproduction
 
 ```bash
