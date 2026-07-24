@@ -983,6 +983,39 @@ and density-via-more-layers is closed for this primitive — the honest ceiling 
 ~6 layers. One-shot, reported whichever way it lands. Secondary read: needle recall
 (§24c gave 1/4) — a real fix should also recover retrieval.
 
+**§25a — outcome (b): the root-cause fix did NOT crack the wall.** Student-forward
+Stage-1 (guarded-13, stabilized S2) → **PPL 13.83 = 1.738×**, needle still 1/4.
+Marginally better than §24c (1.795×), marginally worse than Faz-B (1.70×) —
+squarely inside the same 1.6–1.8× cluster. So exposure bias is **not** the dominant
+driver of the compounding wall.
+
+**Four independent 13-layer configurations now converge:**
+
+| config | S1 dist. | S2 | PPL | needle |
+|--------|----------|-----|-----|--------|
+| odd-13 (§22a) | teacher | base | 1.60× | — |
+| guarded-13 (§24a) | teacher | base | 1.70× | 1/4 |
+| guarded-13 stab (§24c) | teacher | stabilized | 1.795× | 1/4 |
+| guarded-13 student-fwd (§25a) | **student** | stabilized | 1.738× | 1/4 |
+
+The result is now robust and the interpretation honest: the 6→13 density wall is a
+genuine **expressivity/capacity limit of the additive/hybrid linear-attention
+primitive**, not a training artifact — selection (§24a), stabilization (§24c), and
+the mechanism-targeted exposure-bias fix (§25a) all fail to move it materially.
+The practical ceiling for this primitive is ~6 grafted layers (1.11×, §22).
+
+**What remains — and what is now closed.** All *training-side* levers are exhausted.
+The only lever left with a clear rationale is an *architecture-side* one: a
+**higher-capacity O(1) primitive** — the simplest instance being larger recurrent
+state (`bulk_dim`/`dpfp_nu`), which every 13-layer run so far held fixed. That is
+the single definitive test of the capacity hypothesis: if the wall is "per-layer
+memory too small," more state cracks it; if it is "linear attention fundamentally
+under-ranks softmax," it will not (literature leans to a residual gap that state
+only partly closes). Recommended as the *last* density experiment — one parameter,
+one run — after which the density line closes cleanly regardless of outcome, and
+effort returns to the 6-layer product path. BEKLEYEN #18 updated. §23 cost-moat
+deepening remains unsolved and must not be assumed in any product framing.
+
 ## Reproduction
 
 ```bash

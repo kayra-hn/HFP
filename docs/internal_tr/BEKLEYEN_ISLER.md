@@ -66,6 +66,12 @@
     compounding'e doğrudan saldırır), (b) daha güçlü primitif (delta/gated),
     (c) daha büyük state. NOT: §23 maliyet-hendeği derinleştirme HENÜZ çözülmedi;
     ürün/moat çerçevesinde varsayılmamalı.
+19. **[EĞİTİM-TARAFI KAPANDI — §25a] Exposure-bias kök çözümü de tutmadı:**
+    student-forward Stage-1 → 1.738× (yine 1.6-1.8× kümesi). DÖRT 13-kat config
+    hemfikir → duvar EĞİTİM değil, primitifin ifade-gücü/kapasitesi. Kalan TEK
+    net kaldıraç: daha büyük O(1) state (bulk_dim/dpfp_nu) — kapasite hipotezinin
+    kesin testi, tek param/tek koşu. Sonuç ne olursa olsun sonrası: yoğunluk
+    hattını kapat, 6-kat ürün yoluna dön.
 
 ## Ufukta (karar gerektirir)
 
