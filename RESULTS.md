@@ -1221,6 +1221,36 @@ the shipped default (dense graft regime, where they tie and exp is simpler and
 stable); `cubic_flux_chunked` remains a supported flag, now with a documented regime
 map and stability limits. Line closed unless a sparse-regime product need reopens it.
 
+## 28. Cubic, decisive test (pre-registered before the run)
+
+§27b left the central question at p ≈ 0.10 with n=6 — suggestive, not settled.
+This is a power problem, not an ambiguity: with the observed effect size
+(d = 0.411/0.503 ≈ 0.82), n=16 yields t ≈ 3.3 (p ≈ 0.005) *if the effect is real*,
+and clearly fails to separate if it is not. So the question is answerable cheaply
+(CPU-only) by adding seeds.
+
+**Design.** Identical vehicle and settings to §27 (carry_curriculum, CARRY_MAX=16,
+CTX=256, 1200 steps, default η), arms = `exp` vs `cubic_flux_chunked`,
+**seeds 0–15 (n=16), paired by seed** (same seed = same data order, so pairing is
+valid). Primary endpoint fixed in advance: **end-of-training cross-chunk
+verification loss** (the low-variance metric identified in §26b). Secondary:
+streaming probe @256 (reported, not decisive — known high variance).
+
+**Pre-registered criteria.**
+- **CUBIC ADVANTAGE CONFIRMED:** paired t-test p < 0.05 **and** cubic better in
+  ≥ 70% of seeds (≥ 12/16) **and** mean Δ ≥ 0.2 nat. → cubic's sparse-regime edge
+  is established at this scale; documented as a regime-specific architectural
+  finding and written into the paper's contribution list.
+- **REFUTED:** p ≥ 0.05 with mean Δ < 0.15 nat → the §26b/§27 lean was noise;
+  cubic offers no reliable advantage even in its home regime; retired to a flag
+  with that stated plainly.
+- **STILL UNDERPOWERED:** p ≥ 0.05 but mean Δ ≥ 0.2 nat and ≥ 70% wins → effect
+  plausibly real but smaller than estimated; reported as such, no further seeds
+  (diminishing returns), no claim either way.
+
+Any divergent (NaN) run is counted as a **failure of that arm**, not dropped
+(§27b survivorship-bias lesson). Result reported whichever way it lands.
+
 ## Reproduction
 
 ```bash
