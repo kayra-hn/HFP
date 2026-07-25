@@ -1133,6 +1133,47 @@ endpoint (e.g. training-loss curves across seeds as the primary metric, pre-
 registered). `exp` remains the default in the shipped graft recipe. Recorded as an
 open, honestly-inconclusive question rather than a result in either direction.
 
+## 27. Improving cubic: the η (plateau-scale) sweep
+
+`eta_init` was **hard-coded** as `logspace(-4,-2)` in `hfp_bulk_state.py` since
+inception — never swept, inherited by every experiment. Since cubic's plateau
+scale is z\* ≈ 1/√(2η), the default gives z\* ≈ 7–70 while the carry task spans
+256–4096+ tokens, suggesting the plateau was ~2 orders of magnitude too *short*.
+η is now configurable (`ETA_LOG_MIN/MAX`, env-overridable; default unchanged).
+Pre-registered primary metric = end-of-training cross-chunk verification loss
+(low-variance, per the §26b lesson); 3 seeds/arm.
+
+**§27a — result: hypothesis REFUTED, monotonically and in the opposite direction.**
+
+| η range | z\* | cross-chunk loss (mean) [min–max] | seeds better than default |
+|---------|-----|-----------------------------------|---------------------------|
+| **(−4,−2) default** | 7–70 | **1.746** [1.55–1.90] | — (control) |
+| (−6,−4) | 71–707 | 2.167 [1.83–2.56] | **0/3** |
+| (−8,−6) | 707–7071 | 2.306 [1.98–2.57] | **0/3** |
+
+Longer plateaus made cubic *worse*, consistently, with a clean monotone trend
+(1.75 → 2.17 → 2.31). Not a null — a directional refutation.
+
+**Why (and this corroborates an earlier finding).** As η→0, λ→1: the channel stops
+forgetting at all. But this task streams **dense distractor traffic** (a distractor
+key-value every 64 tokens), so a never-forgetting channel accumulates interference
+until the target is unrecoverable. Retention is not the binding constraint here —
+**interference is**. This independently reproduces the early HFP finding that
+memory in this architecture is *interference-limited, not decay-limited*
+(GPU_ROADMAP §0), now via a completely different manipulation. The default η is
+therefore not mistuned in the "too short" direction; if anything the data's
+gradient points the other way.
+
+**Honest status of cubic after §26–§27.** One confirmed win in a sparse
+long-horizon synthetic regime (§6); a clean null in the dense graft regime (§15h);
+a consistent-but-underpowered lean in the carry regime (§26b, training loss ~1.75
+vs exp ~2.15); and now a refuted tuning hypothesis (§27a). Cubic is a *real but
+modest and regime-specific* effect that we have not been able to convert into a
+decisive advantage. `exp` remains the shipped default. The one direction the data
+actually points to — **larger** η (shorter plateau, faster interference flushing,
+z\* ≈ 0.7–7) — is the natural next probe and is cheap; but expectations should be
+calibrated: it tests a *tuning* refinement, not a new capability.
+
 ## Reproduction
 
 ```bash
