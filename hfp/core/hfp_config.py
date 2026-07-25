@@ -45,5 +45,20 @@ class HFPConfig:
     MIXED_PRECISION: bool = True           # use torch.float16 for gate logits only
     WARP_K: float = 0.5                    # Witten propagator warp factor
 
+    # [§27] cubic_flux eta init araligi (log10). Plato olcegi z* ~ 1/sqrt(2*eta):
+    #   varsayilan (-4,-2) -> z* ~ 7..70. Uzun-omur/seyrek-yazim gorevleri (256-4096+
+    #   token) icin bu KISA olabilir -> daha kucuk eta = daha uzun plato. Varsayilan
+    #   degistirilmedi (geriye uyumluluk); deneyde HFP_ETA_LOG_MIN/MAX env ile taranir.
+    ETA_LOG_MIN: float = -4.0
+    ETA_LOG_MAX: float = -2.0
+
 # Global singleton configuration used throughout the package
 config = HFPConfig()
+
+# [§27] Env ile override (deney taramasi icin; env yoksa varsayilan aynen kalir).
+import os as _os
+for _k in ("ETA_LOG_MIN", "ETA_LOG_MAX"):
+    _v = _os.environ.get(f"HFP_{_k}")
+    if _v is not None:
+        setattr(config, _k, float(_v))
+        print(f"[§27] {_k} = {getattr(config, _k)} (env override)")

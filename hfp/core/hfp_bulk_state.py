@@ -164,7 +164,14 @@ class HFPBulkState(nn.Module):
         # cozumden lam_t = 1/sqrt(1 + 2*eta*s_t^2), s_t = anlik state buyuklugu.
         # Gecis olcegi t* ~ 1/sqrt(2*eta): eta buyuk -> kisa plato, kucuk -> uzun.
         # Kanallar arasi 1e-4..1e-2 log-dagilir -> plato ~7..70 token, ogrenilebilir.
-        eta_init = torch.logspace(-4.0, -2.0, self.key_dim)
+        # [§27] ARTIK AYARLANABILIR (varsayilan degismedi: -4..-2, geriye uyumlu).
+        #   Gerekce: plato olcegi z* ~ 1/sqrt(2*eta) -> varsayilan z* ~ 7..70, ama
+        #   uzun-omur/seyrek-yazim gorevleri 256-4096+ token menzilli. Yani cubic'in
+        #   platosu goreve gore ~2 mertebe KISA ayarlanmis olabilir; bu, cubic'in
+        #   §15h/§26b'de parlamamasinin adayi. Kucuk eta -> uzun plato.
+        eta_lo = float(getattr(hfp_config, 'ETA_LOG_MIN', -4.0))
+        eta_hi = float(getattr(hfp_config, 'ETA_LOG_MAX', -2.0))
+        eta_init = torch.logspace(eta_lo, eta_hi, self.key_dim)
         self.log_eta = nn.Parameter(torch.log(eta_init))
 
         # [HFP-DELTA] per-token yazim siddeti beta (0,1); bias +1 -> ~0.73 baslangic
