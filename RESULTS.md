@@ -1087,6 +1087,52 @@ Until one of these lands, `exp` remains the pragmatic default in the shipped gra
 recipe (§15h, where it *was* properly powered and tied), and cubic remains a
 supported flag with one confirmed win (§6) and one open lead (this section).
 
+**§26b — powered hand-off test (K∈{0,1}, 6 seeds, 200 trials): pre-registered
+criterion NOT met. Directionally consistent, statistically inconclusive.**
+
+| K | exp (6 seeds) | cubic (6 seeds) | Δ | ranges separated? |
+|---|---------------|-----------------|---|-------------------|
+| 0 | 33.2% [8.5–69.5] | 53.4% [29–83] | **+20.2** | **no** (heavy overlap) |
+| 1 | 16.2% [3–61.5] | 9.6% [4–14] | −6.6 | no (**direction reverses**) |
+
+The §26a lead does **not** survive proper powering. At K=0 cubic's mean advantage
+persists (+20.2, and its floor 29% > exp's 8.5%), but seed variance is enormous in
+both arms (exp spans 8.5–69.5) and the ranges overlap heavily; a Welch t-test gives
+t≈1.4, p≈0.2 — not significant at n=6. At K=1 the sign **flips** (exp ahead),
+driven by a single exp outlier seed (s5: 61.5% vs its siblings' 3–6%). Reporting
+this as a cubic win would be cherry-picking; the honest verdict is **not confirmed**.
+
+**However — a separate, lower-variance signal points the same way.** On the
+*training objective itself* (averaged over many batches, so far less noisy than
+50–200-trial probes), for the three seeds with logs (s3–s5) cubic learned the
+sparse cross-chunk carry task substantially better in **3/3**:
+
+| seed | exp lossA / lossB(cross-chunk) | cubic lossA / lossB | exp streaming-probe @256 | cubic @256 |
+|------|-------------------------------|---------------------|--------------------------|------------|
+| s3 | 1.81 / 2.01 | **1.38 / 1.62** | 0.0% | **16.7%** |
+| s4 | 1.86 / 2.15 | **0.82 / 1.04** | 0.0% | **53.3%** |
+| s5 | 1.85 / 1.95 | **0.89 / 1.62** | 6.7% | **53.3%** |
+
+(chance 3.3%; streaming probe = the §17-style lifetime probe run at end of
+training, 30 trials.) Here the separation *is* clean — max exp 6.7% < min cubic
+16.7% — and the training losses favour cubic in every seed, on both the in-chunk
+(lossA) and cross-chunk (lossB) terms. Caveats, stated plainly: this is a post-hoc
+comparison on a different probe with only 3 logged seeds and 30 trials, and lower
+training loss is not by itself the pre-registered endpoint.
+
+**Honest synthesis.** Three measures — matched probe K=0, training loss, streaming
+probe — all lean cubic in this sparse-write carry regime, but the one *properly
+pre-registered and powered* comparison fails its separation bar because of seed
+variance. So: **cubic is not vindicated, and not refuted.** The accumulated picture
+(§6 confirmed win; §15h clean null in the dense graft regime; §26b consistent-but-
+underpowered lean here) is best summarized as *cubic appears to help specifically
+in sparse-write / low-occupancy regimes and not otherwise, but the effect size in
+this vehicle is smaller than the seed noise.* Settling it requires either many more
+seeds (12–20, cheap on CPU: this whole run was CPU-only) or a lower-variance
+endpoint (e.g. training-loss curves across seeds as the primary metric, pre-
+registered). `exp` remains the default in the shipped graft recipe. Recorded as an
+open, honestly-inconclusive question rather than a result in either direction.
+
 ## Reproduction
 
 ```bash
