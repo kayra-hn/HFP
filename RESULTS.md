@@ -1174,6 +1174,53 @@ actually points to — **larger** η (shorter plateau, faster interference flush
 z\* ≈ 0.7–7) — is the natural next probe and is cheap; but expectations should be
 calibrated: it tests a *tuning* refinement, not a new capability.
 
+**§27b — the other direction hits a hard stability wall; and the pooled
+exp-vs-cubic comparison.** Larger η (shorter plateau) was tested as the data's
+gradient suggested:
+
+| η range | z\* | outcome |
+|---------|-----|---------|
+| (−2, 0) | 0.7–7 | **1/3 seeds diverged (NaN @ step 414)**; survivors 1.99, 1.02 |
+| (0, +2) | 0.07–0.7 | **3/3 seeds diverged (NaN @ steps 290–419)** |
+
+Aggressive η is **numerically unstable**: λ = 1/√(1+2η z²) with large η drives the
+decay factor toward 0, and gradients through the sequential z-scan blow up once the
+curriculum grows K. This is a genuine boundary of the mechanism, not a tuning miss.
+Note on reading the sweep table: the (−2,0) arm's mean (1.503) *looks* best but is
+computed over **2 surviving seeds only** — averaging the survivors of a config that
+diverges a third of the time is survivorship bias, and the arm is correctly recorded
+as a **failure**, not an improvement. Conclusion for §27: **η tuning does not improve
+cubic in either direction**; the shipped default (−4,−2) sits at a
+stability/performance sweet spot that was, in hindsight, well chosen.
+
+**Pooled primary-metric comparison (the one solid signal from §26–§27).** Combining
+this run's seeds 0–2 with §26b's seeds 3–5 — same vehicle, same low-variance
+endpoint (end-of-training cross-chunk verification loss), same default η:
+
+| | cubic (default η) | exp | Δ (exp−cubic) |
+|---|---|---|---|
+| mean over 6 seeds | **1.731** | 2.141 | **+0.411 nat** |
+| per-seed wins | **5 / 6** | 1 / 6 | (+0.68, +0.37, +0.11, +0.25, +1.25, −0.20) |
+| paired t (df=5) | | | t = 2.00, p ≈ 0.10 |
+
+Cubic learns this sparse-write cross-chunk carry task **better than exp in 5 of 6
+seeds, by ~0.41 nat on average** — but the paired test gives p ≈ 0.10, i.e.
+suggestive and short of conventional significance at n=6. Reported as such: a
+consistent direction, not a proven effect.
+
+**Final position on cubic (closing §26–§27).** The evidence is now a coherent,
+bounded picture rather than a verdict: cubic helps in **sparse-write / long-horizon**
+regimes (§6 confirmed win; here 5/6 seeds on the training objective) and does **not**
+help in the **dense/saturated** graft regime (§15h clean null); the advantage is
+**modest** (~0.4 nat, p≈0.10 — real-looking but under-powered); and it is **not
+improvable by tuning its one free parameter** (§27a/b), with a hard instability
+boundary at large η. The original intuition that cubic "does something real" is
+**partially vindicated** — in a specific regime, at a modest magnitude — while the
+stronger claim of a decisive architectural advantage is not supported. `exp` stays
+the shipped default (dense graft regime, where they tie and exp is simpler and
+stable); `cubic_flux_chunked` remains a supported flag, now with a documented regime
+map and stability limits. Line closed unless a sparse-regime product need reopens it.
+
 ## Reproduction
 
 ```bash
