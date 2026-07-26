@@ -64,7 +64,7 @@ from hfp.models.configuration_hfp import HFPConfig
 from hfp.models.modeling_hfp import HFPForCausalLM
 
 MODE, SEED = sys.argv[1], int(sys.argv[2])
-assert MODE in ("exp", "cubic_flux_chunked"), MODE
+assert MODE in ("exp", "cubic_flux_chunked", "parallel_cubic"), MODE   # [§29] parallel_cubic
 BUDGET = float(sys.argv[3]) if len(sys.argv) > 3 else 1800.0
 
 CARRY_MAX = int(os.environ.get("CC_CARRY_MAX", "16"))   # max dolgu chunk sayisi

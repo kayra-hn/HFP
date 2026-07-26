@@ -67,7 +67,7 @@ from hfp.models.configuration_hfp import HFPConfig
 from hfp.models.modeling_hfp import HFPForCausalLM
 
 MODE, SEED = sys.argv[1], int(sys.argv[2])
-assert MODE in ("exp", "cubic_flux_chunked"), MODE
+assert MODE in ("exp", "cubic_flux_chunked", "parallel_cubic"), MODE   # [§29] parallel_cubic
 BUDGET = float(sys.argv[3]) if len(sys.argv) > 3 else 900.0
 GAPS = [int(g) for g in os.environ.get("LT_GAPS", "256,1024,4096,16384,65536").split(",")]
 TRIALS = int(os.environ.get("LT_TRIALS", "30"))

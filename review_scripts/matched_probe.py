@@ -61,7 +61,7 @@ from hfp.models.configuration_hfp import HFPConfig
 from hfp.models.modeling_hfp import HFPForCausalLM
 
 MODE, SEED = sys.argv[1], int(sys.argv[2])
-assert MODE in ("exp", "cubic_flux_chunked"), MODE
+assert MODE in ("exp", "cubic_flux_chunked", "parallel_cubic"), MODE   # [§29] parallel_cubic
 KS = [int(k) for k in os.environ.get("MP_KS", "0,1,2,4,8,16,32,64").split(",")]
 TRIALS = int(os.environ.get("MP_TRIALS", "30"))
 CTX = int(os.environ.get("MP_CTX", "256"))

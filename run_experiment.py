@@ -318,7 +318,7 @@ def main():
     p.add_argument("--context", type=int, default=256)
     p.add_argument("--key_space", type=int, default=100)
     p.add_argument("--val_space", type=int, default=100)
-    p.add_argument("--decay_mode", choices=["exp", "cubic_flux", "cubic_flux_chunked"], default="exp",
+    p.add_argument("--decay_mode", choices=["exp", "cubic_flux", "cubic_flux_chunked", "parallel_cubic"], default="exp",
                    help="[HFP-CORE] bellek retention yasasi: exp=geometrik baseline, "
                         "cubic_flux=makalenin kubik-plato akisi (ayirt edici mekanizma), "
                         "cubic_flux_chunked=iki-gecisli TAM paralel form (olcekleme)")

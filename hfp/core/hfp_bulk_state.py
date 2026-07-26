@@ -230,6 +230,55 @@ class HFPBulkState(nn.Module):
         new_write_idx = (write_idx + L) % cap
         return short_memory, new_write_idx
 
+    def _parallel_cubic_loglam(self, K_scan, eta, z0, dtype):
+        """[§29] parallel_cubic — cubic'in SIRALI z-taramasi olmadan yeniden formulasyonu.
+
+        Gerekce (RESULTS §28b): cubic'in tek sevk engeli lam_t'nin z_{t-1}'e
+        baglanmasiydi (dogrusal-olmayan -> paralel-scan yok, ozel op, mobil ihrac
+        sorunu). Burada geri besleme ACIK-DONGUYE cevrilir:
+
+            s_t     = lam0 * s_{t-1} + k_t          (AFFINE, sabit katsayi -> chunkwise paralel)
+            lam_t   = lam0 * (1 + 2*eta*s_{t-1}^2)^{-1/2}
+
+        lam0 = sigmoid(decay) = exp modunun ogrenilen kanal-basi decay'i. Yani s,
+        "saf exp altinda z ne olurdu" tahminidir; yeni hiperparametre YOK.
+
+        IC-ICE (nested) MODEL: eta=0 -> lam_t = lam0 = TAM OLARAK exp. Dolayisiyla
+        ifade gucu exp'ten asla dusuk olamaz; "eta sifirdan uzaklasmayi ogreniyor mu"
+        dogrudan olculebilir bir teshis olur.
+
+        Plato korunur: bos kanal (s~0) -> carpan ~1 -> lam ~ lam0 (model lam0~1
+        ogrenirse gercek plato); dolu kanal -> carpan kucuk -> hizli unutma.
+
+        Paralellik: chunk ICI tamamen paralel (O(m^2) matris, GECIS 2 ile ayni
+        desen), sirali tasima yalnizca chunk'lar ARASI — yani exp/GLA ile BIREBIR
+        ayni paralellik yapisi. Ozel sirali op kalmaz.
+        """
+        B, L, D = K_scan.shape
+        dev = K_scan.device
+        lam0 = torch.sigmoid(self.decay).to(dtype)                     # (D,)
+        log_lam0 = torch.log(lam0.clamp_min(1e-12))                    # (D,)
+        eta_v = eta.reshape(1, 1, D)                                   # (1,1,D)
+        s_prev = z0.to(dtype)                                          # (B,D)  s_{-1}
+        outs = []
+        for s0 in range(0, L, self.rec_block):
+            Kb = K_scan[:, s0:s0 + self.rec_block]                     # (B,m,D)
+            m = Kb.size(1)
+            jj = torch.arange(m, device=dev, dtype=dtype).view(m, 1)   # satir = j (hedef)
+            ii = torch.arange(m, device=dev, dtype=dtype).view(1, m)   # sutun = i (kaynak)
+            # W[j,i,d] = lam0_d^(j-i) if i<=j else 0   (log-uzayda, tum usler <=0 -> stabil)
+            W = torch.exp((jj - ii).clamp_min(0.0).unsqueeze(-1) * log_lam0.view(1, 1, D))
+            W = W * (jj >= ii).to(dtype).unsqueeze(-1)                 # (m,m,D)
+            intra = torch.einsum('jid,bid->bjd', W, Kb)                # (B,m,D)
+            carry = torch.exp((jj.view(1, m, 1) + 1.0) * log_lam0.view(1, 1, D))  # (1,m,D)
+            s_seq = carry * s_prev.unsqueeze(1) + intra                # (B,m,D) = s_0..s_{m-1}
+            # lam_t, ORIJINALDEKI GIBI s_{t-1}'e bakar (nedensellik korunur)
+            s_lag = torch.cat([s_prev.unsqueeze(1), s_seq[:, :-1]], dim=1)        # (B,m,D)
+            outs.append(log_lam0.view(1, 1, D)
+                        - 0.5 * torch.log1p(2.0 * eta_v * s_lag * s_lag))
+            s_prev = s_seq[:, -1]
+        return torch.cat(outs, dim=1)                                  # (B,L,D)
+
     def update(self, x, past_state=None, detach_state=True):
         if x.dim() == 2:
             x = x.unsqueeze(1)
@@ -342,7 +391,8 @@ class HFPBulkState(nn.Module):
                 z = z * lam_m.view(1, -1) + K_rev.sum(dim=1)
             retrieved = torch.cat(outputs, dim=1)                             # (B,L,H)
 
-        elif self.write_rule == "delta" and self.decay_mode != "cubic_flux_chunked":
+        elif self.write_rule == "delta" and self.decay_mode not in (
+                "cubic_flux_chunked", "parallel_cubic"):
             # [HFP-DELTA] Sirali delta-yazim; decay_mode lam'i belirler (exp/cubic).
             beta = torch.sigmoid(self.beta_gate(x)).to(dtype)                # (B,L,1)
             if self.decay_mode == "exp":
@@ -385,7 +435,7 @@ class HFPBulkState(nn.Module):
                 outputs.append((num / den).unsqueeze(1))                     # (B,1,H)
             retrieved = torch.cat(outputs, dim=1)                           # (B,L,H)
 
-        elif self.decay_mode == "cubic_flux_chunked":
+        elif self.decay_mode in ("cubic_flux_chunked", "parallel_cubic"):
             # [HFP-SCALE] cubic_flux'in IKI-GECISLI TAM paralel formu (yaklasim DEGIL).
             # Gozlem: lam_t yalnizca z_{t-1}'e baglidir ve z'nin recurrence'i M'siz,
             # elementwise-ucuzdur. O halde:
@@ -409,8 +459,12 @@ class HFPBulkState(nn.Module):
             # [HFP-SCALE HIZ] GECIS 1 (z-taramasi) TorchScript-derlenmis _cubic_zscan ile;
             # birebir ayni lam_seq, ama Python-loop overhead'i kalkar (uzun L'de ~2-4x).
             # Sirali dogasi korunur (dogrusal-olmayan recurrence -> paralel-scan yok).
-            lam_seq = _cubic_zscan(K_scan, eta, z)                                    # (B,L,D)
-            loglam = torch.log(lam_seq.clamp_min(1e-12))
+            if self.decay_mode == "cubic_flux_chunked":
+                lam_seq = _cubic_zscan(K_scan, eta, z)                                # (B,L,D)
+                loglam = torch.log(lam_seq.clamp_min(1e-12))
+            else:
+                # [§29] parallel_cubic — sirali z-taramasi YOK.
+                loglam = self._parallel_cubic_loglam(K_scan, eta, z, dtype)
 
             for s0 in range(0, seq_len, self.rec_block):                         # GECIS 2
                 Qb = Q[:, s0:s0 + self.rec_block]
