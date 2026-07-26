@@ -230,54 +230,16 @@ class HFPBulkState(nn.Module):
         new_write_idx = (write_idx + L) % cap
         return short_memory, new_write_idx
 
-    def _parallel_cubic_loglam(self, K_scan, eta, z0, dtype):
-        """[§29] parallel_cubic — cubic'in SIRALI z-taramasi olmadan yeniden formulasyonu.
-
-        Gerekce (RESULTS §28b): cubic'in tek sevk engeli lam_t'nin z_{t-1}'e
-        baglanmasiydi (dogrusal-olmayan -> paralel-scan yok, ozel op, mobil ihrac
-        sorunu). Burada geri besleme ACIK-DONGUYE cevrilir:
-
-            s_t     = lam0 * s_{t-1} + k_t          (AFFINE, sabit katsayi -> chunkwise paralel)
-            lam_t   = lam0 * (1 + 2*eta*s_{t-1}^2)^{-1/2}
-
-        lam0 = sigmoid(decay) = exp modunun ogrenilen kanal-basi decay'i. Yani s,
-        "saf exp altinda z ne olurdu" tahminidir; yeni hiperparametre YOK.
-
-        IC-ICE (nested) MODEL: eta=0 -> lam_t = lam0 = TAM OLARAK exp. Dolayisiyla
-        ifade gucu exp'ten asla dusuk olamaz; "eta sifirdan uzaklasmayi ogreniyor mu"
-        dogrudan olculebilir bir teshis olur.
-
-        Plato korunur: bos kanal (s~0) -> carpan ~1 -> lam ~ lam0 (model lam0~1
-        ogrenirse gercek plato); dolu kanal -> carpan kucuk -> hizli unutma.
-
-        Paralellik: chunk ICI tamamen paralel (O(m^2) matris, GECIS 2 ile ayni
-        desen), sirali tasima yalnizca chunk'lar ARASI — yani exp/GLA ile BIREBIR
-        ayni paralellik yapisi. Ozel sirali op kalmaz.
-        """
-        B, L, D = K_scan.shape
-        dev = K_scan.device
-        lam0 = torch.sigmoid(self.decay).to(dtype)                     # (D,)
-        log_lam0 = torch.log(lam0.clamp_min(1e-12))                    # (D,)
-        eta_v = eta.reshape(1, 1, D)                                   # (1,1,D)
-        s_prev = z0.to(dtype)                                          # (B,D)  s_{-1}
-        outs = []
-        for s0 in range(0, L, self.rec_block):
-            Kb = K_scan[:, s0:s0 + self.rec_block]                     # (B,m,D)
-            m = Kb.size(1)
-            jj = torch.arange(m, device=dev, dtype=dtype).view(m, 1)   # satir = j (hedef)
-            ii = torch.arange(m, device=dev, dtype=dtype).view(1, m)   # sutun = i (kaynak)
-            # W[j,i,d] = lam0_d^(j-i) if i<=j else 0   (log-uzayda, tum usler <=0 -> stabil)
-            W = torch.exp((jj - ii).clamp_min(0.0).unsqueeze(-1) * log_lam0.view(1, 1, D))
-            W = W * (jj >= ii).to(dtype).unsqueeze(-1)                 # (m,m,D)
-            intra = torch.einsum('jid,bid->bjd', W, Kb)                # (B,m,D)
-            carry = torch.exp((jj.view(1, m, 1) + 1.0) * log_lam0.view(1, 1, D))  # (1,m,D)
-            s_seq = carry * s_prev.unsqueeze(1) + intra                # (B,m,D) = s_0..s_{m-1}
-            # lam_t, ORIJINALDEKI GIBI s_{t-1}'e bakar (nedensellik korunur)
-            s_lag = torch.cat([s_prev.unsqueeze(1), s_seq[:, :-1]], dim=1)        # (B,m,D)
-            outs.append(log_lam0.view(1, 1, D)
-                        - 0.5 * torch.log1p(2.0 * eta_v * s_lag * s_lag))
-            s_prev = s_seq[:, -1]
-        return torch.cat(outs, dim=1)                                  # (B,L,D)
+    # [§29 — TERK EDILEN TASARIM, kayit icin]  Ilk deneme, lam'i ACIK-DONGU bir
+    # vekilden turetiyordu:  s_t = lam0*s_{t-1} + k_t,  lam_t = lam0*(1+2*eta*s^2)^-1/2.
+    # Matematigi dogruydu (eta=0 -> tam exp) ama OLCEK UYUSMAZLIGI yuzunden coktu:
+    # lam0 ~ 0.999 iken s ~ sum(k)/(1-lam0) yani gercek z'nin ~1000 kati buyuyor;
+    # 2*eta*s^2 patliyor -> lam ~ 0 -> loglam cok negatif -> GECIS 2'deki
+    # exp(cs_i - cs_j) ust ucgeninde inf -> inf*0 = NaN (16 seed'in cogu iraksadi).
+    # Ders: acik-dongu vekil, orijinalin KENDINI SINIRLAYAN dongusunu kaybediyor ve
+    # eta'nin olcegi artik gecersiz oluyor. Cozum: blok-donmus GERCEK z (update()
+    # icindeki GECIS 2 dongusune bakin) — olcek yapisal olarak dogru, rec_block=1'de
+    # sirali cubic ile birebir ayni.
 
     def update(self, x, past_state=None, detach_state=True):
         if x.dim() == 2:
@@ -463,21 +425,36 @@ class HFPBulkState(nn.Module):
                 lam_seq = _cubic_zscan(K_scan, eta, z)                                # (B,L,D)
                 loglam = torch.log(lam_seq.clamp_min(1e-12))
             else:
-                # [§29] parallel_cubic — sirali z-taramasi YOK.
-                loglam = self._parallel_cubic_loglam(K_scan, eta, z, dtype)
+                # [§29] parallel_cubic: loglam ONCEDEN hesaplanmaz; her blokta
+                # GERCEK z'den (blok basi) turetilir -> asagidaki dongude.
+                loglam = None
 
             for s0 in range(0, seq_len, self.rec_block):                         # GECIS 2
                 Qb = Q[:, s0:s0 + self.rec_block]
                 Kb = K[:, s0:s0 + self.rec_block]
                 Vb = V[:, s0:s0 + self.rec_block]
                 m = Qb.size(1)
-                cs = torch.cumsum(loglam[:, s0:s0 + m], dim=1)                   # (B,m,D): log A_i, A_i = prod_{j<=i} lam_j
+                if loglam is None:
+                    # [§29] parallel_cubic — BLOK-DONMUS lam: lam, blok basindaki
+                    # GERCEK z'den hesaplanir ve blok boyunca sabit tutulur.
+                    #   * Olcek sorunu YOK (z gercek state; kendini sinirlayan dongu korunur).
+                    #   * Blok ICI tamamen paralel; sirali z-taramasi kalkar.
+                    #   * rec_block=1 -> sirali cubic_flux_chunked ile BIREBIR AYNI
+                    #     (yaklasim hatasi rec_block ile kontrol edilir).
+                    lam_blk = 1.0 / torch.sqrt(1.0 + 2.0 * eta * z * z)          # (B,D)
+                    steps = torch.arange(1, m + 1, device=device, dtype=dtype).view(1, m, 1)
+                    cs = torch.log(lam_blk.clamp_min(1e-12)).unsqueeze(1) * steps  # (B,m,D)
+                else:
+                    cs = torch.cumsum(loglam[:, s0:s0 + m], dim=1)                   # (B,m,D): log A_i, A_i = prod_{j<=i} lam_j
                 A = torch.exp(cs)                                                # (B,m,D) <= 1
 
                 ii = torch.arange(m, device=device).view(m, 1)
                 jj = torch.arange(m, device=device).view(1, m)
                 causal = (ii >= jj).to(dtype)                                    # (m,m)
-                Dm = torch.exp(cs.unsqueeze(2) - cs.unsqueeze(1))                # (B,m,m,D): exp(cs_i - cs_j)
+                # [§29 FIX] clamp_max(0): nedensel (i>=j) girdilerde us zaten <=0
+                # (cs azalan, lam<=1) -> davranis DEGISMEZ; yalnizca maskelenecek
+                # ust ucgende exp(+buyuk)=inf -> inf*0=NaN mayinini etkisizlestirir.
+                Dm = torch.exp((cs.unsqueeze(2) - cs.unsqueeze(1)).clamp_max(0.0))  # (B,m,m,D)
                 
                 if self.write_rule == "delta":
                     Knb = Kn_all[:, s0:s0 + m]
