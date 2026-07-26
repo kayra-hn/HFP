@@ -34,6 +34,16 @@
    3/3 seed geçti, PPL 1.111-1.112×, needle 12/12. Ön-kayıtlı ≥2/3 kriteri
    karşılandı. 6-katman referans reçetesi çok-seed onaylı.
 
+## Cubic hattı — KAPANDI (pozitif)
+
+20. **[TAMAM — 2026-07-24] Cubic rejim haritası tamamlandı.** §26 (sonuçsuz/araç
+    arızası) → §27 (η ayarı iki yönde de geliştirmiyor; büyük η kararsız) →
+    **§28a KESİN TEST: cubic > exp, n=16 eşleşmiş, +0.484 nat, 13/16 seed,
+    p=0.0124** — ön-kayıtlı üç kriter de karşılandı. Hüküm: retention yasası
+    yoğun-yazımda fark etmiyor (§15h), **seyrek-yazımda ölçülebilir fark ediyor**.
+    README + RESULTS güncellendi. Pratik kural: graft/LM → `exp`;
+    seyrek-yazım/uzun-ömür (cihaz-içi hafıza) → `cubic_flux_chunked`.
+
 ## Repo / yayın hijyeni
 
 9. **hf_upload senkron ihlali:** `hfp_bulk_state/bulk_trigger_decoder/

@@ -61,10 +61,21 @@ A fixed-size recurrent memory must forget. *How* it forgets is the design choice
 Set the mode with `decay_mode="exp"` / `"cubic_flux"` (config) or
 `--decay_mode` (CLI). Everything else is held identical, so the two modes are a
 clean controlled comparison of the retention law alone. That comparison has now
-been run at LLM-graft scale and found **no measurable difference** between the
-laws (RESULTS §15h) — the framework's honest answer so far is that *which*
-retention law matters less than how the memory is trained; the law remains a
-switchable axis, with `exp` the pragmatic default for new work.
+been run in two different regimes, and the honest answer is **regime-dependent**:
+
+- **Dense / saturated writes (LLM-graft, WikiText):** *no measurable difference*
+  between the laws (RESULTS §15h). Here `exp` is the pragmatic default — same
+  quality, simpler, faster (no sequential scan).
+- **Sparse writes / long-lived memory (cross-chunk carry):** `cubic_flux_chunked`
+  is **measurably better** than a fair multi-scale learned-λ exponential control —
+  pre-registered, paired, n = 16 seeds: **+0.48 nat, 13/16 seeds, p = 0.012**
+  (RESULTS §28a).
+
+The mechanism explains both: cubic's decay adapts to channel occupancy
+(λ = 1/√(1+2η z²)), so it can protect an unsaturated channel — an advantage that
+exists only when channels are *not* continuously saturated. Practical rule:
+**`exp` for dense-write LM work, `cubic_flux_chunked` for sparse-write /
+long-lived-memory work.**
 
 ## Architecture
 
@@ -196,11 +207,18 @@ the 325k-parameter graft retrieves **never-seen-in-training passphrases at
 An in-window recall mix teaches nothing (ablated: Run 3 vs Run 4) — the
 cross-chunk structure is causal. A controlled retention-law ablation
 (identical twin runs) found **no measurable cubic-vs-exp difference** (PPL
-13.04 vs 12.87; grids above): the retrieval capability belongs to the
-protocol, not the decay law. Open gaps, also recorded: LM quality cost is
-still ~1.6× PPL (criterion ≤1.05× not met), one weak grid cell per law, and
-all of this is a single training seed per arm. Diagnostics:
-`notebooks/kaggle_graft_diagnostics_v1.ipynb`.
+13.04 vs 12.87; grids above): in this dense-write regime the retrieval
+capability belongs to the protocol, not the decay law. (In the *sparse*-write
+regime the law does matter — §28a; see "retention law as the design axis".)
+Diagnostics: `notebooks/kaggle_graft_diagnostics_v1.ipynb`.
+
+**Since resolved (RESULTS §22-§25):** the PPL cost was fixed by reducing graft
+density 13 → 6 layers — **1.11× PPL, needle 4/4, replicated across 3 seeds**
+(§22a-c). Pushing density back up is a *known wall*: layer selection (§24a),
+training stabilization (§24c) and a student-forward exposure-bias fix (§25a)
+all leave 13-layer grafts at 1.6-1.8×, which localizes the limit to error
+**compounding** through stacked lossy layers rather than to training. ~6
+grafted layers is the practical ceiling for this primitive.
 
 ## Repository layout
 

@@ -1251,6 +1251,54 @@ streaming probe @256 (reported, not decisive — known high variance).
 Any divergent (NaN) run is counted as a **failure of that arm**, not dropped
 (§27b survivorship-bias lesson). Result reported whichever way it lands.
 
+**§28a — result: CUBIC ADVANTAGE CONFIRMED (all three pre-registered criteria met).**
+
+| | cubic_flux_chunked | exp (multi-scale learned λ) |
+|---|---|---|
+| cross-chunk verification loss, mean of 16 seeds | **1.794** | 2.278 |
+| paired Δ (exp − cubic) | **+0.484 nat** | |
+| seeds where cubic is better | **13 / 16** | 3 / 16 |
+| paired t (df = 15) | **2.84** | |
+| two-sided p | **0.0124** | |
+| divergences (NaN) | 0 / 16 | 0 / 16 |
+
+Criteria required p < 0.05 (**0.0124** ✓), ≥ 12/16 seed wins (**13/16** ✓), and
+mean Δ ≥ 0.20 nat (**0.484** ✓). Both arms were numerically stable throughout, so
+no survivorship correction applies. Effect size d ≈ 0.71 — consistent with the
+n=6 estimate (0.82) that motivated the power calculation, i.e. the result is a
+confirmation of a pre-specified prediction rather than a discovered pattern.
+
+**What this establishes — and what it does not.** Established: in the
+**sparse-write, cross-chunk carry regime**, content-adaptive cubic retention
+(λ = 1/√(1+2η z²)) learns the carry task **measurably better** than a fair
+multi-scale learned-λ exponential control, under a pre-registered, adequately
+powered, paired design. This is the first properly powered positive result for
+the project's own architectural hypothesis, and it survived a deliberately
+adversarial sequence: a clean null in the dense regime (§15h), an inconclusive
+zero-power run (§26a), an underpowered lean (§26b), and a refuted tuning
+hypothesis in both directions (§27a/b).
+
+Not established, and explicitly *not* claimed: (i) this does **not** overturn
+§15h — in the dense/saturated graft regime the two laws still tie, and the two
+results are consistent under the occupancy-dependence explanation (cubic's edge
+requires unsaturated channels); (ii) the endpoint is **training loss on a
+small-scale synthetic task** (2 layers, hidden 64), not language-model quality or
+downstream retrieval — the streaming probe remained too noisy to separate arms
+(§26b), and no claim is made there; (iii) the absolute magnitude is modest
+(0.48 nat against a ~3.4-nat chance baseline); (iv) transfer to LM scale is an
+open question that §15h suggests is regime-dependent, not automatic.
+
+**Consequences.** (a) `exp` remains the shipped default for the **graft** recipe
+(dense regime, where they tie and exp is simpler/stable). (b) `cubic_flux_chunked`
+is promoted from "supported flag with an open question" to a **documented,
+regime-specific mechanism with a measured advantage** — the recommended choice for
+sparse-write / long-lived-memory workloads, which is precisely the on-device
+personal-memory regime the project targets. (c) The paper's contribution list gains
+a defensible empirical claim: *retention-law choice is immaterial in dense-write
+regimes but measurably matters in sparse-write regimes* — a statement that unifies
+§15h and §28a rather than contradicting either. (d) The cubic line closes here on a
+positive, with its scope honestly bounded.
+
 ## Reproduction
 
 ```bash
