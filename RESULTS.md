@@ -1299,6 +1299,24 @@ regimes but measurably matters in sparse-write regimes* — a statement that uni
 §15h and §28a rather than contradicting either. (d) The cubic line closes here on a
 positive, with its scope honestly bounded.
 
+**§28b — engineering decision: cubic shelved; `exp` is the shipping path.** The
+§28a finding stands and is not retracted — but a validated *finding* is not a
+shippable *component*. Cubic is shelved for engineering, not scientific, reasons:
+(1) its z-scan is **sequential** (λ_t depends on z_{t-1}), so unlike exp's parallel
+cumsum it cannot be parallelized — slower training and prefill; (2) that scan is a
+**custom op**, awkward to export to mobile runtimes (GGUF/ExecuTorch/Core ML),
+which conflicts directly with the project's on-device goal; (3) it has a **narrow
+stability window** (§27b NaNs at large η) that η tuning cannot widen (§27a/b);
+(4) in the dense graft regime it pays those costs for **zero or negative** return
+(§15h: PPL 13.04 vs 12.87, reliability 38/45 vs 42/45 — exp ahead on both, though
+not significantly). Un-shelving requires, at minimum, (i) a parallel /
+associative-scan formulation of the z-recursion (or a closed-form intra-chunk
+approximation) and (ii) a demonstrated mobile export path without a custom op;
+ideally also (iii) replication of the sparse-regime advantage at LM scale, since
+§15h shows transfer across regimes is not automatic. The shelf is expected to be
+temporary: the target product regime (personal memory = sparse writes) is cubic's
+home, so this is a deployment-engineering blocker, not a dead end.
+
 ## Reproduction
 
 ```bash

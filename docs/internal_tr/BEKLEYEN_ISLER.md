@@ -44,6 +44,22 @@
     README + RESULTS güncellendi. Pratik kural: graft/LM → `exp`;
     seyrek-yazım/uzun-ömür (cihaz-içi hafıza) → `cubic_flux_chunked`.
 
+21. **[RAF — 2026-07-24] Cubic mühendislik olarak rafa kaldırıldı.** §28a bulgusu
+    GEÇERLİ ve kalıcı; ama sevk yolu `exp`. Gerekçe (bilimsel değil, mühendislik):
+    (a) sıralı z-taraması → paralelleştirilemiyor, eğitim/prefill yavaş;
+    (b) özel op → mobil runtime'lara (GGUF/ExecuTorch/CoreML) taşıması zor —
+    cihaz-içi hedefle doğrudan çatışıyor; (c) dar stabilite penceresi (§27b: büyük
+    η'da NaN), η ayarıyla iyileştirilemiyor; (d) yoğun rejimde getiri sıfır/negatif
+    (§15h: PPL 13.04 vs 12.87, ızgara 38/45 vs 42/45).
+    **Rafı kaldırma koşulları** (biri yeterli değil, ilk ikisi şart):
+    1. z-taramasının paralel/associative-scan formu (Blelloch tarzı) türetilsin —
+       veya chunk-içi kapalı-form yaklaşım bulunsun;
+    2. mobil-uyumlu ihraç yolu kanıtlansın (özel op olmadan);
+    3. seyrek rejim avantajı LM ölçeğinde (graft + seyrek görev) tekrarlansın —
+       §28a küçük-ölçek sentetik, transfer otomatik değil (§15h).
+    Not: ürün rejimi (kişisel hafıza = seyrek yazım) cubic'in evi olduğu için bu
+    raf kalıcı değil; dağıtım mühendisliği çözülünce yeniden değerlendirilir.
+
 ## Repo / yayın hijyeni
 
 9. **hf_upload senkron ihlali:** `hfp_bulk_state/bulk_trigger_decoder/
