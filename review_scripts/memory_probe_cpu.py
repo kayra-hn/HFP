@@ -41,6 +41,12 @@ Cikti: gap basina birebir-geri-getirme yuzdesi + ust sinir + on-kayitli hukum.
 """
 import os, sys, glob, random, time
 
+# [FIX] 'python review_scripts/x.py' calistirildiginda Python sys.path'e SCRIPT'in
+# dizinini ekler, repo kokunu degil -> 'No module named hfp'. Kokü kendimiz ekliyoruz.
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, DynamicCache
 from hfp.models.grafting import (GraftConfig, graft_llama, set_graft_mode,
