@@ -60,6 +60,22 @@
     Not: ürün rejimi (kişisel hafıza = seyrek yazım) cubic'in evi olduğu için bu
     raf kalıcı değil; dağıtım mühendisliği çözülünce yeniden değerlendirilir.
 
+## Hafıza organı hattı — AÇIK (en yüksek öncelik)
+
+22. **[BULGU — 2026-07-28] O(1) durumu bilgi TUTMUYOR (§30a/b/c).** Cache'siz
+    koşulda tüm sondalar %0, eşleşmiş sondada gap=0'da bile %0. Checkpoint
+    yüklemesi doğrulandı (72/72 bit-bit, out_gain eğitim izli) → bulgu gerçek.
+    §22 needle'i yeniden kapsamlandırıldı (KV-cache taşıyordu; 16k zaten Qwen'in
+    32k penceresi içinde). Ürün "hafıza yardımcı-işlemcisi" çerçevesi GERİ ÇEKİLDİ.
+23. **[SEBEP BULUNDU]** S2 recall'da chunk A `torch.no_grad()` altında işleniyor
+    → cross-chunk gradyan yalnız OKUMA yoluna akıyor; YAZMA yolu (decay, log_eta,
+    conv_k, beta_gate, alpha_logit) sınır ötesi saklamayı hiç öğrenmiyor.
+    §17-§21'in park edilmiş küçük-ölçek çöküşüyle AYNI sebep.
+24. **[SONRAKİ DENEY — hedefli]** S2'de chunk A'nın `no_grad`'ını kaldır, grafiği
+    B'ye kadar koru (graft-ölçek `bptt_across_chunks=True` karşılığı). SEQ=128,
+    6 katman + gradient checkpointing ile sığmalı. Uyarı: küçük-ölçek analogu
+    (§21 TBPTT) tek başına yetmemişti — gerekli ama yeterli olmayabilir.
+
 ## Repo / yayın hijyeni
 
 9. **hf_upload senkron ihlali:** `hfp_bulk_state/bulk_trigger_decoder/

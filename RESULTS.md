@@ -1425,6 +1425,68 @@ public claim remains the narrower one already supported: *a 6-layer O(1) graft
 preserves language quality (1.11× PPL, 3 seeds) and does not break long-range
 retrieval when a KV cache is present.*
 
+**§30c — matched probe also fails; load verified; finding is FINAL.** The §30b
+matched-protocol replication (chunk 128, query at end of a filler-padded chunk,
+gaps 0→24 chunks) scored **0% at every distance, including gap = 0** — a single
+chunk boundary, ~128 tokens. Every trial returned a byte-identical filler
+continuation ("not running. The routine check…"), i.e. the fact chunk exerted *no
+influence whatsoever*. The harness-mismatch explanation is therefore eliminated.
+
+Because a result this absolute can also be produced by a silent checkpoint-loading
+failure (`strict=False` loads nothing on a name mismatch, which would leave the
+graft untrained → C = 0% while B still works off the cache), the load was verified
+explicitly: **72/72 tensors matched by name and shape, 72/72 bit-identical in the
+model, and `out_gain` had clearly moved away from its 0.1 init (mean 0.234, std
+0.097, range 0.032–0.432)**. The weights are loaded and trained. The negative
+stands.
+
+**Mechanistic cause — identified, and it is in the training code.** In Stage-2
+cross-chunk recall the write chunk is processed under `torch.no_grad()`:
+
+```python
+with torch.no_grad():
+    model(xa)            # chunk A: write the fact into state — NO GRADIENT
+    ...                  # gap chunks: carry state — NO GRADIENT
+out = model(xb, labels=xb)   # chunk B: read; loss only here
+```
+
+So the cross-chunk objective back-propagates **only into the read path**
+(`conv_q`, `retrieval_norm`, `out_gain`). The write-path parameters
+(`decay`, `log_eta`, `conv_k`, `beta_gate`, `alpha_logit`) receive gradient
+exclusively from *within-chunk* write→read pairs in B. The model was therefore
+never trained to **store something for a later chunk** — only to read whatever
+happens to be in the state, and to write for immediate local reuse. §30's result is
+the direct, predictable consequence. (This limitation was written down honestly in
+the notebook at the time — "cross-chunk gradyan yalniz OKUMA yoluna akar" — but its
+implication for the memory claim was not followed through until now.)
+
+**Unification with the parked small-scale line.** §17–§21 found cross-chunk recall
+collapsing at the *first* state hand-off in the small-scale model, and the parked
+suspects were "read-path dilution + decay-gradient plumbing". §30 reproduces the
+same failure at graft scale, and names the plumbing precisely: **no gradient
+reaches the write path across a boundary.** Two independent lines, one cause.
+
+**Consequences — what must change in the project's claims.**
+- The §22 needle result is **re-scoped**: it shows grafting does not break
+  long-range retrieval *when the KV cache is present*. It does **not** show the
+  O(1) state stores or retrieves anything. README and any external write-up must
+  say this explicitly.
+- §23's VRAM/latency numbers remain valid (structural), but their *interpretation*
+  changes: the 6 grafted layers earn their keep on local language modelling
+  (1.11× PPL vs 168 PPL untrained — they clearly learned something), not as a
+  long-range memory store.
+- The "memory co-processor" product framing is **withdrawn** until a state that
+  demonstrably stores across boundaries exists.
+
+**The targeted fix (next experiment, well-motivated rather than speculative).**
+Train Stage-2 recall with gradient flowing through the write chunk and across the
+boundary: remove the `no_grad` on chunk A, keep the graph to B (the graft-scale
+equivalent of `bptt_across_chunks=True`). Cost: activation memory for A+gap+B in
+one graph — feasible at SEQ=128, 6 layers, with gradient checkpointing. This is the
+first intervention that addresses the identified cause rather than a symptom.
+Caveat, stated up front: the small-scale analogue (Görev G / §21) showed no effect
+from TBPTT alone, so this may be necessary but not sufficient.
+
 ## Reproduction
 
 ```bash

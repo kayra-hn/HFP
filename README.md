@@ -201,8 +201,9 @@ interpolation between additive (archival) and delta (updating) writes,
 be a **cross-chunk recall distillation curriculum** — recall documents split
 across chunk boundaries so attention cannot see the needle and the teacher's
 full-attention retrieval becomes the KL target for the memory path. With it,
-the 325k-parameter graft retrieves **never-seen-in-training passphrases at
-512-16384 token distances** (reliability grid over 5 lengths × 3 positions ×
+the 325k-parameter graft **preserves** retrieval of never-seen-in-training
+passphrases at **512-16384 token distances** (with the KV cache present — see the
+scope note below) (reliability grid over 5 lengths × 3 positions ×
 3 seeds: 38/45 for cubic, 42/45 for exp), trained entirely on a free T4.
 An in-window recall mix teaches nothing (ablated: Run 3 vs Run 4) — the
 cross-chunk structure is causal. A controlled retention-law ablation
@@ -211,6 +212,15 @@ cross-chunk structure is causal. A controlled retention-law ablation
 capability belongs to the protocol, not the decay law. (In the *sparse*-write
 regime the law does matter — §28a; see "retention law as the design axis".)
 Diagnostics: `notebooks/kaggle_graft_diagnostics_v1.ipynb`.
+
+> **Scope note (RESULTS §30).** The needle evaluation carries a `DynamicCache`
+> across chunks, so the 22 un-grafted full-attention layers see the whole stream
+> (16k is inside Qwen2.5's native 32k context). A controlled test that resets the
+> KV cache per chunk — leaving only the O(1) state — retrieves **0%**. So these
+> results show that grafting **does not break** long-range retrieval; they do
+> **not** show that the O(1) state stores it. Cause identified: Stage-2 recall
+> trains the write chunk under `torch.no_grad()`, so no gradient ever reaches the
+> write path across a boundary.
 
 **Since resolved (RESULTS §22-§25):** the PPL cost was fixed by reducing graft
 density 13 → 6 layers — **1.11× PPL, needle 4/4, replicated across 3 seeds**
