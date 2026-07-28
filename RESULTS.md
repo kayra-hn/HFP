@@ -1546,6 +1546,46 @@ range):
   materially; if they do, the fix trades general quality for memory and that
   trade-off is reported explicitly.
 
+## 32. Delta write rule for cross-boundary storage (pre-registered)
+
+Motivated by the project's own oldest finding — **"the memory is
+interference-limited, not decay-limited"** (README / GPU_ROADMAP §0). The delta
+rule exists precisely to remove interference: it reads the current association and
+writes the *difference*, `M ← M + β·k(v − kᵀM)ᵀ`, overwriting a key's old value
+instead of stacking onto it. If the O(1) state fails to hold facts because repeated
+additive writes bury them, delta is the mechanism-level fix.
+
+Two observations make this the natural next arm:
+- The graft already runs `write_rule='hybrid'` (α-gate between additive and delta)
+  but with `alpha_init=-2` (σ(−2)≈0.12, additive-weighted), and training logs show
+  `alpha_ort` pinned at **0.119 → 0.135** across the whole run — the model never
+  moved toward delta on its own.
+- `additive` was locked in by K2, but that decision was made on **language-model
+  perplexity**, not on memory retention. The right rule for a memory organ may
+  differ from the right rule for LM quality; if so, that trade-off is itself a
+  result worth documenting.
+
+**Design.** `WRITE_RULE='delta'` (α fixed at 1, pure delta), **with**
+`S2_WRITE_BPTT=True` — gradient to the write path is a prerequisite, so delta is
+tested on top of §31 rather than instead of it. Versus §31 this is a **single
+variable** (write rule). All else identical: 6-layer reference set, exp decay,
+dpfp, seed 0, gaps {0,1,2,3}. Checkpoint lineage `…WD`.
+
+**Pre-registered criteria** (evaluated with the §30 harness, condition C, matched
+probe, gaps 0–3 — inside the trained range):
+- **DELTA UNLOCKS STORAGE:** matched-C P1 ≥ 60% at gap 0 **and** materially above
+  the §31 arm → interference was the binding constraint; delta becomes the
+  memory-path default and the memory-organ line re-opens (next: range extension,
+  then bigger state).
+- **NO DIFFERENCE vs §31:** both arms behave alike → the write *rule* is not the
+  constraint; remaining levers are an explicit retrieval objective and/or larger
+  state (`bulk_dim`, `dpfp_nu`), which preserve O(1) since the state stays constant
+  in context length.
+- **DELTA HURTS:** memory unchanged and PPL regresses materially (> ~1.3×) →
+  confirms K2's LM-based choice and closes the write-rule lever.
+- Guard: PPL and cache-present needle are reported alongside; if delta buys memory
+  at a real LM cost, the trade-off is stated explicitly rather than hidden.
+
 ## Reproduction
 
 ```bash
