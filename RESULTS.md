@@ -1364,6 +1364,67 @@ stored key — must NOT emit a stored value).
 Reported whichever way it lands. A negative here is high-value: it is cheaper to
 learn now than after building a product on the assumption.
 
+**§30a — result: CACHE-DEPENDENT. The O(1) state alone retrieved nothing.**
+6-layer reference checkpoint (`hfp_graft_exp_g6_s1_final.pt`, Run 8), 4096-token
+stream, 8 trials/probe, chunk 512:
+
+| condition | P1 verbatim | P2 variant | P3 updated | P4 multi-fact | P5 false-retrieval |
+|---|---|---|---|---|---|
+| **A** full attention (upper bound) | 100% | 100% | 0% | 100% | 0% |
+| **B** hybrid + persistent KV cache | 88% | 38% | 100% | 38% | 0% |
+| **C** hybrid + O(1) state only | **0%** | **0%** | **0%** | **0%** | 0% |
+
+Condition C collapses completely. Sample C outputs show generic base-model
+continuations with no trace of the stream ("The license server is" → "not
+available…"; "The cache directory is" → "located at /home/username") — the model
+is not confabulating *stored* values (P5 = 0% everywhere, which is genuinely good
+news for factual safety), it simply retrieves **nothing**. P3 was excluded as
+model-limited (upper bound A itself scored 0%: with both the old and new value in
+context the base model prefers the prior-favoured "8080").
+
+**Three findings, in order of importance.**
+
+1. **The retrieval demonstrated in §22 was carried substantially by the KV cache,
+   not by the O(1) state.** This is the honest reinterpretation of the needle
+   result: grafting does not *break* retrieval (true, and still a valid claim), but
+   it was never shown that the memory *holds* the information — and under this test
+   it does not. Any framing that presents the O(1) state as a standalone memory
+   organ is **not supported by evidence** and must not be used in product or
+   investor language.
+2. **Even with the cache, query-style retrieval is weak.** Condition B scores only
+   38% on the lexical-variant and multi-fact probes versus 100% for full attention.
+   So the "answer questions about accumulated content" capability is limited in the
+   grafted model generally, not only in the cache-free regime.
+3. **No confabulation.** P5 = 0% in all conditions: the model never emitted a
+   stored value for a never-stored key. Whatever else is true, it does not
+   fabricate false memories — a useful property to have measured.
+
+**Honest caveat before treating this as final — probe/training mismatch.** This
+project has already been burned once by exactly this confound: in the small-scale
+line, an *unmatched* probe produced chance-level results while a *matched* probe
+(built from the training distribution) recovered real signal (§19 → §26a). The same
+mismatch is present here: S2 cross-chunk recall was trained with **128-token**
+chunks and the query at the **end of a filler-padded chunk**, whereas condition C
+streams **512-token** chunks and issues the query as a bare ~6-token fragment with
+no local context. So §30a cleanly establishes that *the current setup does not
+retrieve from state*, but it does not cleanly separate "the state holds nothing"
+from "the state holds something the model cannot address in this format". The
+decisive follow-up is cheap and pre-registered below.
+
+**§30b — pre-registered follow-up (matched-probe replication).** Re-run condition C
+with the protocol matched to training: chunk = 128, the query placed at the end of a
+128-token filler chunk, fact-to-query distance swept over the trained range
+(≈1-12 chunks) and beyond. Criteria: (a) matched-C ≥ 60% on P1 at trained distances
+→ §30a was a harness artifact, the memory organ exists but is format-sensitive, and
+the co-processor path stays open with an explicit range limit; (b) matched-C still
+< 30% → §30a stands as a genuine capability finding: **the O(1) state is not a
+usable memory store in the grafted model**, and the co-processor framing is
+abandoned or deferred until a different design (cache-free training objective,
+larger state, larger base) is demonstrated. Until (a) is shown, the project's honest
+public claim remains the narrower one already supported: *a 6-layer O(1) graft
+preserves language quality (1.11× PPL, 3 seeds) and does not break long-range
+retrieval when a KV cache is present.*
+
 ## Reproduction
 
 ```bash
