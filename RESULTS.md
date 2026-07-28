@@ -1521,7 +1521,10 @@ seed 0). Checkpoint lineage tagged `…W`.
 
 **Declared experimental limitation.** With BPTT on, A+gaps+B form one graph, so
 activation memory grows with the gap. The curriculum is therefore shortened to
-gaps ∈ {0,1,2,3} (≈ up to 512 tokens carried) instead of {0…12}. This run asks
+gaps ∈ {0,1} (≈ up to 256 tokens carried) instead of {0…12} — the first attempt
+used {0,1,2,3} and hit CUDA OOM on a T4 at step ~4 (A+3 fillers+B = 5 chunks in one
+graph, with gradient checkpointing necessarily off because it conflicts with the
+streaming state). This run asks
 *"does the write path learn to store across a boundary at all?"*, **not** "at what
 range". Range extension is a separate, later question, and the result must not be
 reported as a range claim.
