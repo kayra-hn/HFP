@@ -201,7 +201,7 @@ interpolation between additive (archival) and delta (updating) writes,
 be a **cross-chunk recall distillation curriculum** — recall documents split
 across chunk boundaries so attention cannot see the needle and the teacher's
 full-attention retrieval becomes the KL target for the memory path. With it,
-the 325k-parameter graft **preserves** retrieval of never-seen-in-training
+the graft **preserves** retrieval of never-seen-in-training
 passphrases at **512-16384 token distances** (with the KV cache present — see the
 scope note below) (reliability grid over 5 lengths × 3 positions ×
 3 seeds: 38/45 for cubic, 42/45 for exp), trained entirely on a free T4.

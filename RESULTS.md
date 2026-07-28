@@ -725,7 +725,7 @@ needle @512/2048/8192/16384 FOUND in ≥2/3 seeds; PPL within 8.6-9.1.
 **§22b — Run 8 (seed 1, Colab T4, 2026-07-21): PASS.** PPL 7.96 → **8.84
 (1.111×)**, needle **4/4** (512/2048/8192/16384, out-of-training vocab). Nearly
 identical to Run 7 (8.84, 1.112×) — a remarkably tight replication, plausible
-given the small (325k) adapter distilling to the same teacher. Peak VRAM
+given the small (150k) adapter distilling to the same teacher. Peak VRAM
 14.37 GB (Colab environment; 9.28 GB on Kaggle for the same recipe — allocator/
 environment difference, both within T4). The ≥2/3 needle criterion is already
 met with 2/2; Run 9 (seed 2) completes the pre-registered set.
@@ -745,13 +745,13 @@ Three-seed summary of the 6-layer reference recipe (GRAFT_N=6, layers
 **Verdict (pre-registered §22a criteria — MET).** needle ≥2/3 seeds at all four
 lengths: **3/3** (12/12 total). PPL within 8.6–9.1: **3/3**. The recipe replicates
 across three independent seeds. The near-identical PPL across seeds is expected
-for a 325k-param adapter distilling to a fixed frozen teacher on a fixed corpus —
+for a 150k-param adapter distilling to a fixed frozen teacher on a fixed corpus —
 the optimization landscape is narrow — and is itself evidence of a stable, not
 lucky, result. Stage-1 for the 6-layer recipe is also ~4× cheaper than the
 13-layer version (MSE 0.081→0.043 in 14 min vs ~1 h; fewer layers to match).
 
 This closes the multi-seed replication line. The headline is now defensible:
-*a 6-layer O(1)-memory graft of Qwen2.5-1.5B (325k trainable params, ~0.03%)
+*a 6-layer O(1)-memory graft of Qwen2.5-1.5B (**149,910** trainable params, ~0.01%)
 reaches 1.11× base perplexity while passing needle-in-haystack retrieval at
 512–16384 tokens with out-of-training-vocabulary secrets — reproduced across
 three seeds, trained on free-tier T4.*
@@ -1486,6 +1486,20 @@ one graph — feasible at SEQ=128, 6 layers, with gradient checkpointing. This i
 first intervention that addresses the identified cause rather than a symptom.
 Caveat, stated up front: the small-scale analogue (Görev G / §21) showed no effect
 from TBPTT alone, so this may be necessary but not sufficient.
+
+### Measurement corrections (2026-07-28, from the §31 run's setup output)
+
+Two numbers repeated in earlier sections were carried over from the **13-layer**
+era and are wrong for the **6-layer reference recipe**:
+- **Trainable parameters: 149,910 (~0.01% of the base), not 325k (~0.03%).** The
+  325k figure is the 13-layer graft. The 6-layer recipe is *more* frugal than
+  claimed; the corrected number is used going forward.
+- **Untrained (zero-shot) graft PPL: 12.0, not ~168.** The 168 figure is likewise
+  the 13-layer diagnostic (T2). This matters for interpretation: the trained graft
+  moves PPL 12.0 → 8.84 (base 7.96), so the 6 grafted layers *do* contribute, but
+  the model is considerably more tolerant of them being untrained than the stale
+  number implied. Any statement of the form "untrained 168 → trained 8.84,
+  therefore the layers carry heavy load" is **overstated** and is corrected here.
 
 ## 31. Write-path gradient across chunk boundaries (pre-registered)
 
