@@ -1487,6 +1487,51 @@ first intervention that addresses the identified cause rather than a symptom.
 Caveat, stated up front: the small-scale analogue (Görev G / §21) showed no effect
 from TBPTT alone, so this may be necessary but not sufficient.
 
+## 31. Write-path gradient across chunk boundaries (pre-registered)
+
+Direct intervention on the cause identified in §30c. Two things blocked gradient
+from ever reaching the write path across a boundary, and **both** had to go:
+1. Stage-2 recall processed the write chunk under `torch.no_grad()`.
+2. `HFPGraftAttention` **detached** the streaming state (`M`, `z`, and the conv
+   state) at every chunk boundary.
+
+Fix: new `stream_bptt` flag on the module (default `False`, backward compatible)
+plus `S2_WRITE_BPTT` in the notebook, which runs chunk A and the gap chunks **with
+gradient** and keeps the graph through to chunk B. Now the cross-chunk loss can
+credit the *write* operation (`decay`, `log_eta`, `conv_k`, `beta_gate`,
+`alpha_logit`), not only the read.
+
+**Single variable.** Everything else reverts to the §22 reference recipe
+(`GRAFT_N=6`, `GRAFT_FROM_MAP=None`, `S2_STAB=False`, `S1_STUDENT_FORWARD=False`,
+seed 0). Checkpoint lineage tagged `…W`.
+
+**Declared experimental limitation.** With BPTT on, A+gaps+B form one graph, so
+activation memory grows with the gap. The curriculum is therefore shortened to
+gaps ∈ {0,1,2,3} (≈ up to 512 tokens carried) instead of {0…12}. This run asks
+*"does the write path learn to store across a boundary at all?"*, **not** "at what
+range". Range extension is a separate, later question, and the result must not be
+reported as a range claim.
+
+**Pre-registered criteria** — evaluated with the §30 harness, condition C
+(fresh KV cache per chunk, matched probe, gap = 0…3, i.e. inside the trained
+range):
+- **WRITE PATH LEARNS:** matched-C P1 ≥ 60% at gap 0 **and** ≥ 40% at gap 3 →
+  §30c's diagnosis is confirmed *and* actionable; the O(1) state becomes a real
+  store within the trained range. Next step then: extend range (longer BPTT
+  windows, truncated BPTT with periodic gradient), re-open the memory-organ line.
+- **PARTIAL:** P1 ≥ 60% at gap 0 but collapses by gap 3 → the write path can store
+  across *one* boundary but not chain; points to state capacity or decay dynamics
+  rather than gradient plumbing.
+- **NO EFFECT:** P1 < 30% at gap 0 → gradient plumbing was necessary but not
+  sufficient (consistent with the small-scale TBPTT null, §21). The honest
+  conclusion would then be that this architecture, at this scale and state size,
+  does not learn cross-boundary storage, and the memory-organ line closes pending
+  a design change (larger state, different write rule, or a dedicated retrieval
+  objective rather than LM loss).
+- Guard: standard §22 metrics (PPL ≤ ~1.2×, needle with cache) must not regress
+  materially; if they do, the fix trades general quality for memory and that
+  trade-off is reported explicitly.
+
 ## Reproduction
 
 ```bash

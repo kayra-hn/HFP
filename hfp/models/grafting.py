@@ -180,6 +180,12 @@ class HFPGraftAttention(nn.Module):
         # Streaming durumu (needle/uzun-akis eval): (M, z, cq_state, ck_state)
         self.streaming = False
         self._stream_state = None
+        # [§31] stream_bptt: chunk sinirinda state DETACH EDILMEZ -> gradyan sinir
+        # otesine akar. Gerekce (RESULTS §30c): S2 recall'da yazma yolu sinir otesi
+        # saklamayi hic ogrenmiyordu, cunku (a) chunk A no_grad altindaydi VE
+        # (b) burada state detach ediliyordu. Ikisi de kalkmadan yazma yolu
+        # cross-chunk hedeften gradyan ALAMAZ. Varsayilan False (geriye uyumlu).
+        self.stream_bptt = False
 
     # ---------- yardimcilar ----------
 
@@ -202,7 +208,8 @@ class HFPGraftAttention(nn.Module):
             state = x.new_zeros(B, kk - 1, ch)
         xp = torch.cat([state, x], dim=1)
         y = conv(xp.transpose(1, 2)).transpose(1, 2)
-        return y, xp[:, xp.size(1) - (kk - 1):, :].detach()
+        new_state = xp[:, xp.size(1) - (kk - 1):, :]
+        return y, (new_state if self.stream_bptt else new_state.detach())
 
     def _alpha(self, dtype):
         if self.cfg.write_rule == "additive":
@@ -330,7 +337,10 @@ class HFPGraftAttention(nn.Module):
 
         out, M, z = self._memory(qf, kf, vh, beta, M, z)                # (BH,L,D)
         if self.streaming:
-            self._stream_state = (M.detach(), z.detach(), cq, ck)
+            # [§31] stream_bptt=True -> detach YOK: B chunk'inin loss'u, A chunk'indaki
+            # YAZMA islemine (decay/log_eta/conv_k/beta_gate/alpha) gradyan gonderir.
+            self._stream_state = ((M, z, cq, ck) if self.stream_bptt
+                                  else (M.detach(), z.detach(), cq, ck))
 
         out = self.retrieval_norm(out.view(B, H, L, D)) * self.out_gain # kafa-basi kazanc
         out = out.permute(0, 2, 1, 3).reshape(B, L, H * D)
@@ -461,6 +471,14 @@ def enable_streaming(model, flag: bool = True):
             m.streaming = flag
             if not flag:
                 m._stream_state = None
+
+
+def set_stream_bptt(model, flag: bool = True):
+    """[§31] Chunk sinirinda state detach'ini KAPAT/AC. True iken cross-chunk loss
+    yazma yoluna gradyan tasir (bellek maliyeti artar: A+gap+B tek grafik)."""
+    for m in model.modules():
+        if isinstance(m, HFPGraftAttention):
+            m.stream_bptt = flag
 
 
 def reset_streaming(model):
