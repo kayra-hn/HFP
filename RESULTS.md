@@ -1317,6 +1317,53 @@ ideally also (iii) replication of the sparse-regime advantage at LM scale, since
 temporary: the target product regime (personal memory = sparse writes) is cubic's
 home, so this is a deployment-engineering blocker, not a dead end.
 
+## 30. Memory-organ capability test (pre-registered)
+
+Everything in the "memory co-processor" product framing rests on a capability that
+**has not been measured**: can information be recovered from the O(1) state by a
+*query*, when the KV cache is **not** available for the older stream?
+
+Two gaps in the existing evidence:
+1. **Retrieval mode.** §22's needle test carries a single `DynamicCache` across the
+   whole stream, so the 22 un-grafted full-attention layers can see the needle
+   directly. That test establishes *"grafting did not break retrieval"*; it does
+   **not** establish *"the information is held in the O(1) state"*. For the
+   co-processor claim the KV cache must be bounded — otherwise memory grows
+   linearly and there is no memory organ.
+2. **Query type.** The needle probe is verbatim continuation of the exact inserted
+   phrase. A memory organ must answer *queries* — updated facts, multiple facts,
+   and it must **not** confabulate about facts never stored.
+
+**Design — 3 conditions × 5 probe types.** Conditions: (A) full-attention over the
+full context, grafted layers in `teacher` mode = **upper bound** (what the base
+model could do if it saw everything); (B) hybrid + persistent KV cache = the §22
+setting; (C) hybrid + **fresh KV cache per chunk**, HFP streaming state carried =
+**the real co-processor test** — anything older than the current chunk can only
+come from the O(1) state. Note (C) matches the *training* protocol (S2 cross-chunk
+recall trains with no cache across chunks), so it is the regime the model was
+trained for. Probes: P1 verbatim (control), P2 lexical variant, P3 updated fact
+(later value must win), P4 multi-fact discrimination, P5 negative control (never-
+stored key — must NOT emit a stored value).
+
+**Pre-registered criteria** (n trials per probe, exact-match on the target value):
+- **MEMORY ORGAN CONFIRMED:** in condition (C), P1–P4 ≥ 60% each **and** P5 false-
+  retrieval ≤ 20%, with (C) within 25 points of (A) on P1–P4. → the O(1) state is a
+  usable memory organ; the co-processor framing is supported and product work can
+  proceed on it.
+- **CACHE-DEPENDENT:** (B) succeeds but (C) collapses (< 30% on P1/P3). → retrieval
+  in prior results was carried substantially by the KV cache; the O(1) state alone
+  is not yet a memory organ. The co-processor claim is **not** supported and must
+  not be used in any product/pitch framing until fixed (options: train explicitly
+  for cache-free recall, larger state, bigger base).
+- **MODEL-LIMITED:** (A) itself fails a probe → that probe is beyond the 1.5B base
+  model, not a memory failure; reported separately and excluded from the memory
+  verdict (this is why the upper-bound condition exists).
+- **CONFABULATION FAILURE:** P5 false-retrieval > 40% in (C) → the memory emits
+  plausible-but-unstored values; unusable as a factual store regardless of P1–P4.
+
+Reported whichever way it lands. A negative here is high-value: it is cheaper to
+learn now than after building a product on the assumption.
+
 ## Reproduction
 
 ```bash
