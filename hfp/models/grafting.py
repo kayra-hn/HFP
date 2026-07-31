@@ -101,6 +101,15 @@ class GraftConfig:
     eta_log_max: float = -2.0
     alpha_init: float = -2.0                 # hybrid: sigmoid(-2)~0.12 additive-agirlikli
     ret_len: int = 2                         # attention forward tuple uzunlugu (HF surumu)
+    # [§34] Hafiza yoluna KENDI egitilebilir q/k/v projeksiyonlari.
+    #   False (varsayilan, geriye uyumlu): base'in DONMUS projeksiyonlari paylasilir.
+    #   True: q/k/v kopyalanip egitilebilir yapilir (o_proj paylasik-donmus kalir,
+    #         cikti base'in artik uzayinda kalsin diye).
+    #   Gerekce (RESULTS §34): kucuk-olcek model kendi projeksiyonlariyla tek sinir
+    #   gecisinde %33-53 aliyor (§26b), graft donmus projeksiyonlarla %0 (§30/31/33).
+    #   Hipotez: donmus k_proj softmax-attention icin optimize; sikistirilmis
+    #   cagrisimsal bellege ADRESLENEBILIR kayit yazmaya uygun degil.
+    own_proj: bool = False
 
 
 class HFPGraftAttention(nn.Module):
@@ -128,9 +137,26 @@ class HFPGraftAttention(nn.Module):
             p.requires_grad_(False)
 
         # Paylasilan (frozen) projeksiyonlar — warm-start: kopya degil referans
-        self.q_proj = teacher_attn.q_proj
-        self.k_proj = teacher_attn.k_proj
-        self.v_proj = teacher_attn.v_proj
+        if cfg.own_proj:
+            # [§34] q/k/v'nin EGITILEBILIR kopyalari. Ogretmenin agirliklariyla
+            # baslatilir -> init davranisi paylasik haliyle BIREBIR ayni; eklenen
+            # tek sey serbestlik derecesi. o_proj paylasik-donmus kalir.
+            def _clone(lin):
+                new = nn.Linear(lin.in_features, lin.out_features,
+                                bias=lin.bias is not None,
+                                device=lin.weight.device, dtype=lin.weight.dtype)
+                with torch.no_grad():
+                    new.weight.copy_(lin.weight)
+                    if lin.bias is not None:
+                        new.bias.copy_(lin.bias)
+                return new
+            self.q_proj = _clone(teacher_attn.q_proj)
+            self.k_proj = _clone(teacher_attn.k_proj)
+            self.v_proj = _clone(teacher_attn.v_proj)
+        else:
+            self.q_proj = teacher_attn.q_proj
+            self.k_proj = teacher_attn.k_proj
+            self.v_proj = teacher_attn.v_proj
         self.o_proj = teacher_attn.o_proj
 
         # --- HFP parametreleri (egitilen kisim) ---
@@ -426,7 +452,10 @@ def graft_llama(model, cfg: Optional[GraftConfig] = None,
         grafted.append(i)
 
     # HFP parametrelerini ac (paylasilan frozen projeksiyonlar haric)
-    frozen_shared = {"q_proj", "k_proj", "v_proj", "o_proj", "teacher"}
+    # [§34] own_proj ise q/k/v ARTIK PAYLASIK DEGIL -> egitilebilir birakilir.
+    #   'teacher.*' her durumda donmus kalir (isim onekiyle elenir).
+    frozen_shared = ({"o_proj", "teacher"} if cfg.own_proj
+                     else {"q_proj", "k_proj", "v_proj", "o_proj", "teacher"})
     for m in model.modules():
         if isinstance(m, HFPGraftAttention):
             for name, p in m.named_parameters():

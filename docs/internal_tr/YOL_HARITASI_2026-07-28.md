@@ -45,7 +45,8 @@ Aynı mekanizma, aynı görev ailesi; fark projeksiyonların eğitilebilirliği.
 **Tasarım.** Graft'lı 6 katmana **kendi k/v (ve q) projeksiyonları** ver; base'in
 projeksiyonları o katmanlarda artık ödünç alınmaz (residual/adapter olarak
 başlatılabilir: kopya ile başla, sonra serbest bırak).
-- Eğitilebilir param: ~2.4M × 6 kat × 2-3 proj ≈ **40-50M** (modelin ~%3'ü)
+- Eğitilebilir param: **~18.9M** (modelin ~%1.3'ü) — Qwen GQA (2 KV kafası)
+  sayesinde k/v ucuz; ilk tahminim 40-50M idi, ölçtüm: 19M
 - Tek GPU'da eğitilebilir; base yine donmuş, bilgi korunuyor
 - Eğitim: §31+§33 düzeltmeleriyle (yazma-BPTT + maskeli recall denetimi) —
   onlar kalıcı, çünkü gerçek hataları düzeltiyorlardı
@@ -63,7 +64,7 @@ başlatılabilir: kopya ile başla, sonra serbest bırak).
 
 ## 2. Paralel hat — Compute (bağlayıcı kısıt)
 
-Bedava katmanlar (Colab/Kaggle/Lightning) 40-50M param eğitimini zorlar. Bu hat
+Bedava katmanlar (Colab/Kaggle/Lightning) 19M param eğitimini zorlayabilir. Bu hat
 **şimdi** başlamalı, çünkü başvurular haftalar sürüyor:
 
 - HuggingFace community GPU grant

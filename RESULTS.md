@@ -1705,6 +1705,51 @@ the field — a **documented methodological confound**: apparent long-range retr
 in attention/O(1) hybrids can be carried entirely by the residual KV cache, and is
 routinely measured with the cache present (§30, erratum above).
 
+## 34. Trainable projections for the memory path (pre-registered)
+
+The §33a decision point concluded the limit is architectural. This is the
+design change it called for — and it is motivated by a **direct comparison in our
+own data**, not by speculation:
+
+| model | projections | matched probe, one boundary |
+|---|---|---|
+| small-scale HFP (§26b) | **own, trainable** | **33–53%** |
+| Qwen graft (§30/§31/§33) | **borrowed, frozen** | **0%** |
+
+Same memory mechanism, same task family, same probe protocol. The salient
+difference is whether the model can *learn the representation under which a fact is
+stored*. In the graft, the write key is whatever Qwen's frozen `k_proj` emits — a
+representation optimised for softmax attention over a growing cache, not for writing
+addressable entries into a compressed associative store. The only trainable
+machinery was ~150k params of conv, decay, gates and output gain.
+
+**Design.** `GraftConfig.own_proj=True`: each grafted layer gets its **own
+trainable `q/k/v`**, initialised as exact copies of the teacher's, so behaviour at
+initialisation is bit-identical to the shared-frozen setup — the only thing added is
+freedom. `o_proj` stays shared and frozen, keeping the memory output anchored in the
+base model's residual space. Trainable parameters rise 149,910 → **~19.0M (~1.3% of
+the 1.5B base)** — Qwen's GQA (2 KV heads) keeps `k/v` cheap. Base remains frozen.
+
+**Retained from earlier work** (they fixed genuine defects and cost nothing):
+`S2_WRITE_BPTT=True` (§31) and `S2_RECALL_MASK=True` (§33). Lineage `…WMP`.
+
+**Pre-registered criteria** (memory probe, condition C, matched protocol, gap 0):
+- **≥ 60%** → the frozen-projection diagnosis is confirmed and the memory path
+  works. Next: range extension, then the demo; the memory thesis is back on the table.
+- **30–60%** → graft reaches small-scale parity. Direction confirmed but capacity
+  limited; continue with larger state and/or delta writes (§32), now justified.
+- **< 30%** → the frozen-projection hypothesis also fails. The graft route to a
+  memory organ is then **closed**, and the only remaining path is a memory-first
+  model trained from scratch — expensive, and a separate decision, not a next run.
+- Guards: PPL ≤ ~1.2× and cache-present needle must not regress. With 19M trainable
+  params over-fitting/quality drift is a real risk, so a PPL regression here is
+  informative rather than merely a nuisance.
+
+**Honest note on cost.** This is the first arm that meaningfully leaves the
+"325k/150k params, extreme frugality" framing behind. If it succeeds, the headline
+becomes "~1% of parameters" rather than "0.01%" — still small, but the frugality
+claim must be restated accordingly.
+
 ## 32. Delta write rule for cross-boundary storage (pre-registered)
 
 Motivated by the project's own oldest finding — **"the memory is
