@@ -117,7 +117,13 @@ Headline findings (small scale, synthetic recall; patterns are seed-robust):
 - **Official recipe (locked)**: `cubic_flux_chunked` decay + `additive` writes +
   `dpfp` features + `ffn_type="standard"` (WikiText-2 ablation, RESULTS §10; write
   rule locked by the pre-registered K2 experiment, RESULTS §13).
-- **`cubic_flux` long-horizon win**: In sparse, long-gap regimes (gap ≥ 256), `cubic_flux_chunked` paired with DPFP outperforms the exponential baseline significantly (3x recall advantage), validating the core long-horizon hypothesis.
+- **`cubic_flux` long-horizon win**: In sparse, long-gap regimes (gap ≥ 256), `cubic_flux_chunked` paired with DPFP outperforms the exponential baseline significantly (3x recall advantage) — confirmed at n=16 seeds, p=0.012 (RESULTS §28a). Note this is a *relative* result on a small-scale synthetic task; both arms are weak in absolute terms.
+- **⚠ What the O(1) state does NOT do (RESULTS §30):** in the LLM graft, long-range
+  retrieval measured so far is carried by the KV cache of the un-grafted attention
+  layers, **not** by the recurrent state. With the cache reset per chunk, retrieval
+  from the state alone is 0%. The graft is validated as an *efficient-attention*
+  technique (1.11× PPL, ~8% VRAM and ~21% decode saving at 128k), **not** as a
+  long-term memory store. Work on the latter is in progress (§31-§33).
 - **Language Modeling**: HFP showed a favorable small-scale TinyShakespeare ranking against a GPT-2-style baseline under the same historical skip-one objective (PPL labels are under revision; see RESULTS §14). This is evidence for LM viability, not a final next-token/O(1) headline claim.
 - **GLA family comparison — under revision (honest note)**: a metric artifact
   (double-shifted labels; RESULTS §14) made the published HFP-vs-GLA numbers

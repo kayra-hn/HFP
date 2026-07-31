@@ -2,6 +2,25 @@
 
 > 🇹🇷 **Türkçe:** [Deney Sonuçları (Türkçe)](docs/tr/DENEY_SONUCLARI.md)
 
+> ## ⚠ ERRATUM (2026-07-28) — scope of the retrieval claims
+>
+> Sections written before 2026-07-28 that describe the graft "retrieving" facts at
+> long distances are **correct as measurements** but were **misattributed**: the
+> retrieval was carried by the KV cache of the 22 un-grafted attention layers, not
+> by the O(1) recurrent state. With the cache reset per chunk, retrieval from the
+> state alone is **0%** at every distance tested, including a single chunk boundary
+> (§30a–§30c; checkpoint load verified bit-exact). The cause is a training recipe
+> that could not teach cross-boundary storage (`no_grad` on the write chunk, state
+> detached at boundaries, recall target diluted in a full-sequence LM loss). Removing
+> the first two changed nothing (§31a); the third is under test (§33).
+>
+> **Unaffected by this erratum:** perplexity results, the graft-density wall and its
+> compounding diagnosis (§24–§25), the VRAM/latency measurements (§23), and the
+> retention-law regime findings (§15h, §28a) — none of these depend on the state
+> holding long-range information.
+>
+> See the detailed correction above §15f.
+
 All experiments are small-scale (≤1M params, synthetic recall tasks, CPU),
 multi-seed where stated, and fully reproducible with the scripts in
 `review_scripts/`. Chance level is 3.3% throughout. These are architecture-level
@@ -361,6 +380,42 @@ uses `logits_to_keep` to bound memory). Pre-registered: @512 FOUND with
 out-of-training secrets (clean retrieval proof); @2048 target FOUND; @8192+
 informative (beyond trained range — §3's train-short→infer-long precedent
 applies or fails honestly); PPL stable ~12.9.
+
+> ### ⚠ RETROACTIVE CORRECTION (2026-07-28) — read before §15f–§15g
+>
+> These sections attribute long-range retrieval to information travelling through
+> the O(1) recurrent memory. **That attribution is wrong**, and the error dates
+> from the introduction of the cross-chunk recipe in Run 5. Two independent causes,
+> both established later:
+>
+> 1. **The evaluation is confounded (§30a).** The needle harness carries one
+>    `DynamicCache` across all chunks, so the 22 un-grafted full-attention layers
+>    see the entire stream — and 16 384 tokens is *inside* Qwen2.5's native 32 k
+>    context. A controlled version that resets the KV cache per chunk, leaving only
+>    the O(1) state, retrieves **0%** (§30a/§30b/§30c, load verified 72/72 bit-exact).
+> 2. **The training could not have taught storage (§30c, §31a).** Stage-2 recall ran
+>    the write chunk under `torch.no_grad()`, detached the streaming state at every
+>    chunk boundary, and diluted the recall target inside a full 128-token LM loss.
+>    All three block gradient to the write path; removing the first two changed
+>    nothing (§31a).
+>
+> **What survives:** the *empirical* claim that the distance curriculum improved
+> long-context needle performance (Run 4 missed @8192, Run 5 found it) — that
+> comparison is real. **What does not:** the mechanistic claim that the O(1) memory
+> carries it. The most likely actual mechanism is that training on long,
+> distance-varied sequences improved how the grafted layers behave at long context,
+> which in turn improved *cache-based* retrieval by the remaining attention layers.
+>
+> **Warning sign we had and did not chase.** The small-scale line (§17–§21) was
+> simultaneously finding that cross-chunk carry collapses at the first boundary.
+> Both lines cannot be true of the same mechanism. That contradiction was parked
+> instead of resolved; resolving it would have surfaced this months earlier. The
+> methodological lesson is recorded here deliberately: **where two lines of your own
+> evidence disagree is where the most information is.**
+>
+> Sections §15f–§15g are left unedited below as the original record; read every
+> "retrieval" claim in them as *"the hybrid model retrieves, with the KV cache
+> present"*, not as evidence about the recurrent state.
 
 **§15f — Run 5 complete (2026-07-18): LONG-RANGE RETRIEVAL, CLEAN EVAL.**
 Hardened needle (secrets never seen in training, full-phrase criterion):
