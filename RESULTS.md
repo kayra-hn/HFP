@@ -1657,6 +1657,54 @@ Lineage `…WM`.
   objective, unfrozen base) or close the memory-organ line and publish the negative.
 - Guard: PPL must stay ≤ ~1.2× and cache-present needle must not regress.
 
+**§33a — result: NO EFFECT. Decision point reached; the limit is architectural.**
+With all three training-side blockers removed simultaneously (`no_grad` off, state
+not detached, recall loss masked to answer tokens only):
+
+| gap | ~tokens | C: O(1) state | A: upper bound |
+|-----|---------|---------------|----------------|
+| 0 | 128 | **0%** | **100%** |
+| 1 | 256 | **0%** | — |
+| 2 | 384 | **0%** | — |
+
+Guards passed (PPL 8.84 = 1.112×, unchanged; cache-present needle 4/4), so nothing
+was traded away — the interventions simply did not produce storage. Every output was
+again a byte-identical filler continuation: the fact chunk exerts no influence on
+the query chunk through the state, at any distance, not even across one boundary.
+
+**Verdict (pre-registered):** the inability to store across boundaries is **not a
+training-recipe problem**. Three targeted fixes, each addressing a genuine defect we
+verified in the code, changed nothing. Combined with §31a and the small-scale §21
+null, the training-side explanation is exhausted.
+
+**Most plausible architectural cause (stated as hypothesis, not finding).** The
+graft **shares Qwen's frozen `q/k/v/o_proj`**. The "key" under which a fact would be
+stored is whatever the frozen `k_proj` emits — a representation optimised for
+softmax attention over a growing cache, not for writing addressable entries into a
+compressed associative store. The only trainable machinery is ~150k params of
+depthwise conv, per-channel decay/η, write gates and an output gain. That may simply
+lack the degrees of freedom to *form* a retrievable association, no matter how the
+loss is shaped. Note this is consistent with everything observed: local behaviour is
+learned well (PPL 1.11×), but nothing addressable survives a boundary.
+
+**Consequences — the memory-organ line is closed as a recipe-level project.**
+Continuing to patch the training loop is not justified: three pre-registered,
+well-motivated interventions produced exactly zero movement. What remains is not a
+tweak but a **redesign** — giving the memory path its own trainable projections
+(rather than borrowing frozen ones), a dedicated retrieval objective, and likely a
+larger state; i.e. building a memory-augmented model rather than grafting one on.
+That is a research programme, not a next run, and it should only be started as a
+deliberate choice.
+
+**What the project has, validated, independent of this:** a 6-layer O(1) graft at
+149,910 trainable params holding language quality to **1.11× PPL across 3 seeds**,
+with **~8% VRAM and ~21% decode-latency savings at 128k**; a mapped
+graft-density wall with a compounding diagnosis (§24–§25); a regime-dependent
+retention-law result (§15h vs §28a, n=16, p=0.012); and — of independent value to
+the field — a **documented methodological confound**: apparent long-range retrieval
+in attention/O(1) hybrids can be carried entirely by the residual KV cache, and is
+routinely measured with the cache present (§30, erratum above).
+
 ## 32. Delta write rule for cross-boundary storage (pre-registered)
 
 Motivated by the project's own oldest finding — **"the memory is

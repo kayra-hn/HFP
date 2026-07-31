@@ -71,10 +71,20 @@
     → cross-chunk gradyan yalnız OKUMA yoluna akıyor; YAZMA yolu (decay, log_eta,
     conv_k, beta_gate, alpha_logit) sınır ötesi saklamayı hiç öğrenmiyor.
     §17-§21'in park edilmiş küçük-ölçek çöküşüyle AYNI sebep.
-24. **[SONRAKİ DENEY — hedefli]** S2'de chunk A'nın `no_grad`'ını kaldır, grafiği
-    B'ye kadar koru (graft-ölçek `bptt_across_chunks=True` karşılığı). SEQ=128,
-    6 katman + gradient checkpointing ile sığmalı. Uyarı: küçük-ölçek analogu
-    (§21 TBPTT) tek başına yetmemişti — gerekli ama yeterli olmayabilir.
+24. **[KAPANDI — 2026-07-28] Eğitim tarafı tükendi.** Üç blokaj da kaldırıldı ve
+    depolama oluşmadı:
+    - §31 (`no_grad` kaldırıldı + state detach'i kapatıldı) → gap0 %0
+    - §33 (recall loss'u yalnız cevap tokenlarına maskelendi) → gap0 %0
+    - üst sınır her ikisinde de %100 → sonda geçerli, model tam attention'la çözüyor
+    - guard'lar temiz (PPL 1.11×, cache'li needle 4/4) → takas yapılmadı, sadece
+      müdahaleler işe yaramadı
+    **Hüküm:** sınır eğitim reçetesinde değil, MİMARİDE. En makul hipotez: graft
+    Qwen'in DONMUŞ q/k/v projeksiyonlarını paylaşıyor; adreslenebilir bir ilişki
+    *kurmak* için serbestlik derecesi yok (eğitilen ~150k param sadece conv, decay,
+    kapılar, out_gain). Devamı yama değil YENİDEN TASARIM olur (hafıza yoluna kendi
+    eğitilebilir projeksiyonları, özel retrieval hedefi, daha büyük state) — ayrı bir
+    araştırma programı, bilinçli karar gerektirir. §32 (delta) ve büyük-state kolları
+    da bu kapsamda; tek başlarına koşulması artık gerekçelendirilemez.
 
 ## Repo / yayın hijyeni
 
