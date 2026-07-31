@@ -1549,6 +1549,59 @@ range):
   materially; if they do, the fix trades general quality for memory and that
   trade-off is reported explicitly.
 
+**§31a — result: NO EFFECT, and it exposes a third blocker that was in our own
+§1.** Write-path BPTT trained cleanly (PPL 8.84 = 1.111×, unchanged; needle 4/4
+with cache — guard passed), but the memory probe is unmoved:
+
+| gap | ~tokens | C: O(1) state | A: upper bound |
+|-----|---------|---------------|----------------|
+| 0 | 128 | **0%** | **100%** |
+| 1 | 256 | **0%** | — |
+
+The upper bound at 100% makes this a *controlled* negative: the probe is valid and
+the base model solves it trivially with full attention; the O(1) path still carries
+nothing. Consistent with the small-scale TBPTT null (§21). Gradient plumbing was
+**necessary but not sufficient**.
+
+**Third blocker, found while recording this — the recall loss is 1/128 diluted.**
+Stage-2 recall computes `out = model(xb, labels=xb)`: a **full LM loss over all 128
+tokens of chunk B**, of which only the last few are the answer. The remaining ~124
+tokens are highly-predictable filler. So the gradient signal for "retrieve the fact
+from memory" is a small fraction of the batch loss, and the model can minimise that
+loss almost entirely by predicting filler — never learning retrieval at all.
+
+This is **exactly the failure mode this project already documented as §1**
+("supervision density gates learnability": single-supervised-token recall sequences
+sit at the `ln(vocab)` plateau and never learn), and which was already fixed once at
+small scale (Görev C v1 → v2 switched to dense supervision and only then learned).
+The same flaw was sitting in the graft recipe unnoticed. Three blockers stacked:
+(1) `no_grad` on the write chunk — fixed in §31; (2) state detached at the boundary
+— fixed in §31; (3) **recall target buried in dense filler loss — still present.**
+
+## 33. Masked recall supervision (pre-registered)
+
+Fix (3): for recall batches, mask the LM loss to the **answer tokens only**
+(`labels = -100` everywhere else), so 100% of that batch's gradient is about
+retrieval rather than ~3%. Motivated directly by §1 — the project's own most robust
+methodological finding — rather than by a new hypothesis.
+
+**Single variable vs §31**: `S2_RECALL_MASK=True`; write-path BPTT stays on (it is a
+prerequisite: gradient must both *reach* the write path and *be about* retrieval).
+Everything else identical (6-layer set, exp, hybrid writes, seed 0, gaps {0,1}).
+Lineage `…WM`.
+
+**Pre-registered criteria** (memory probe, condition C, matched, gap 0):
+- **STORAGE LEARNED:** ≥ 60% → the three blockers together explain §30; the O(1)
+  state is a real store within the trained range and the memory line re-opens.
+- **PARTIAL:** 30–60% → signal appears; combine with delta writes (§32) and/or
+  larger state before concluding.
+- **NO EFFECT:** < 30% → all three training-side blockers are removed and storage
+  still does not emerge. That would be strong evidence the limitation is
+  **architectural/capacity**, not training, and the honest move is to stop patching
+  the recipe: either change the design (much larger state, dedicated retrieval
+  objective, unfrozen base) or close the memory-organ line and publish the negative.
+- Guard: PPL must stay ≤ ~1.2× and cache-present needle must not regress.
+
 ## 32. Delta write rule for cross-boundary storage (pre-registered)
 
 Motivated by the project's own oldest finding — **"the memory is
