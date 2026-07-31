@@ -62,17 +62,25 @@ başlatılabilir: kopya ile başla, sonra serbest bırak).
 
 ---
 
-## 2. Paralel hat — Compute (bağlayıcı kısıt)
+## 2. Paralel hat — Compute (DÜZELTİLDİ: şimdilik gerekmiyor)
 
-Bedava katmanlar (Colab/Kaggle/Lightning) 19M param eğitimini zorlayabilir. Bu hat
-**şimdi** başlamalı, çünkü başvurular haftalar sürüyor:
+**Önceki taslakta "grant başvurularına şimdi başla" yazmıştım — yanlıştı, düzelttim:**
 
-- HuggingFace community GPU grant
-- NVIDIA Inception
-- Bulut araştırma kredileri (Google/AWS research credits)
+- **HuggingFace community GPU grant, Spaces içindir** (demo barındırma), eğitim
+  compute'u vermez. §34 için işe yaramaz; ileride demo yayınlarken işe yarar.
+- **§34 için grant'a gerek yok.** 2-3 saatlik tek koşu, Kaggle'ın haftalık 30
+  saatine sığıyor. Şimdi başvuruyla uğraşmak üretkenmiş gibi hissettiren ama
+  olmayan iş olur.
 
-**Başvuru materyali hazır:** repo + RESULTS + erratum. Dürüst negatifler
-**avantaj** — metodolojik ciddiyet gösteriyor.
+**Ne zaman gerekli olur:** §34 tutar ve ölçek büyürse (çok-seed replikasyon,
+menzil genişletme, 7B kontrolü). O noktada gerçekçi seçenekler:
+- **TPU Research Cloud (TRC)** — bireysel araştırmacılara açık, en gerçekçi ücretsiz
+  eğitim compute'u
+- NVIDIA Inception (genelde tüzel kişilik ister)
+- Bulut araştırma kredileri (genelde akademik bağlantı ister)
+
+**Hazır materyal:** `docs/PROJECT_SUMMARY.md` — tek sayfa, dürüst, her başvuruda ve
+soğuk e-postada kullanılabilir; makalenin de çekirdeği.
 
 ---
 
