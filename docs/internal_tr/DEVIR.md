@@ -54,6 +54,13 @@ tamamen kendisinde (çift-lisanslama kapısı açık tutulmalı).
   mobil ihraç sorunu, dar stabilite penceresi). Raf kaldırma koşulları
   BEKLEYEN #21'de.
 
+### Hazırlanmış ama KOŞULMAMIŞ (kayıt için)
+- **§29 `parallel_cubic`:** cubic'in sıralı z-taramasını kaldıran blok-donmuş form.
+  **Kapı testi koşuldu ve geçti** (rec_block=1'de sıralı cubic ile **bit-bit aynı**,
+  1.16× hız). Kalite deneyi (n=16) koşulmadı; cubic raflandığı için gerekçesi zayıf.
+- **§32 delta yazım (graft'ta):** hazırlandı, koşulmadı; §33a/§34a graft-hafıza
+  yolunu kapatınca gerekçesi ortadan kalktı.
+
 ### Şu an koşan / bekleyen
 - **§35** (`notebooks/chain_capacity_v35.ipynb`): küçük-ölçek modelde
   **kapasite × yazım kuralı** taraması. Merkezi soru: state neden **bir** sınırı
@@ -65,7 +72,10 @@ tamamen kendisinde (çift-lisanslama kapısı açık tutulmalı).
 
 ## 4. Çalışma kuralları (uyulması şart)
 
-- **Ön-kayıt:** her koşudan ÖNCE kriterler RESULTS'a yazılır. Sonuç ne çıkarsa o yazılır.
+- **Ön-kayıt:** her koşudan ÖNCE kriterler **RESULTS.md'ye** yazılır — otorite kayıt
+  orasıdır. Notebook markdown'ı veya yol haritası **ön-kayıt sayılmaz** (notebook koşu
+  sırasında düzenlenebilir ve nbstrip filtresi altındadır). Bu kural bir kez ihlal
+  edildi (§35 önce yalnız notebook/haritadaydı), koşudan önce fark edilip düzeltildi.
 - **Negatifler yayınlanır.** Kayıtların ~2/3'ü negatif; bu bir özellik, kusur değil.
 - **Güç kontrolü:** iki kol da şanstaysa "null" değil **"sonuçsuz"** raporlanır.
 - **Üst-sınır kolu:** bir sonda başarısızsa, base modelin o sondayı çözüp
