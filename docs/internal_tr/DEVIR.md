@@ -62,19 +62,41 @@ tamamen kendisinde (çift-lisanslama kapısı açık tutulmalı).
   yolunu kapatınca gerekçesi ortadan kalktı.
 
 ### Şu an koşan / bekleyen
-- **§35 v3** (`notebooks/chain_capacity_v35.ipynb`): küçük-ölçek modelde
+- **§35a — v3 KOŞULDU ve GEÇERSİZ (2026-08-01).** Negatif sonuç DEĞİL, geçersiz
+  koşu. İki bağımsız kusur: (1) araç §26b yeteneğini üretemedi — taban K=0'da
+  **%8.5**, §26b'de %33.2; bir sınırı geçemeyen modelde "neden ikinciyi
+  geçemiyor" sorulamaz. (2) birincil metrik kirliydi — B chunk etiketleri
+  chunk-içi çiftleri de içeriyor, P=4'te denetlenen 5 tokenın 4'ü chunk-içi;
+  gözlenen 2.2974 taşıma tamamen şansta olsa da çıkacak değer.
+  Kök sebep: v2 kapsam kısıntısı **CPU** ölçümüne göre yapıldı, GPU'ya geçilince
+  tekrar ölçülmedi. v3'ün tamamı T4'te **833 sn** sürdü (limitin %1.9'u).
+  Ayrıca: `ESKI` sondanın K=0'da %100'ü üst sınır DEĞİL — o dizi
+  `[tgt_k, v, tgt_k]`, üç token, `local_window=8` içinde.
+
+- **§35 v4** (`notebooks/chain_capacity_v35.ipynb`): küçük-ölçek modelde
   **kapasite × yazım kuralı** taraması. Merkezi soru: state neden **bir** sınırı
   geçiyor da **ikincisini** geçemiyor? (§26b, `exp` kolu: K=0'da **%33.2**, seed
   aralığı %8.5–69.5; K=2'de şansa düşüyor. **Dikkat:** eskiden bu belgede yazan
   "%33-53" yanlıştı — 33.2 `exp` kolunun, 53.4 `cubic` kolunun ortalamasıdır;
   §35 `exp` sabitliyor.)
-  **v2 tasarımı güç yetersizliğinden iptal edildi** (2 seed + mutlak %30 eşiği,
-  §26b'nin 6 seed'de bile ayıramadığı bir ölçümde). v3: **2 kol × 4 seed**
-  (taban nu2/additive vs nu4/delta), bütçe aynı (8 koşu).
-  **Birincil metrik: eşleşmiş cross-chunk doğrulama kaybı (nat), eşik Δ ≤ −0.15
-  nat + 4/4 işaret.** Sonda doğruluğu ikincil/betimleyici.
-  **Bu bir TARAMA deneyi** — n=4'te işaret testi en iyi p=0.0625; "kanıtlandı"
-  denmeyecek. Gerekçe ve tam ön-kayıt RESULTS §35'te.
+  **v4 tasarımı:** araç ayarları §26b/§27/§28a ile birebir geri alındı
+  (CTX 256, 1200 adım, BS 8, CARRY_MAX 16, P 6, DIST_EVERY 64),
+  **2 kol × 6 seed** (taban nu2/additive vs nu4/delta).
+  **ARAÇ GEÇERLİLİK KAPISI:** taban kol K=0'da seed-ortalaması **≥%25** değilse
+  koşu geçersiz ilan edilir ve hipotez hakkında hiçbir şey yazılmaz. (v3'te bu
+  kapı yoktu, bu yüzden sonuç gibi görünen bir sayı üretti.)
+  **Birincil metrik: `val_cross`** — yalnız cross-chunk hedef tokenındaki kayıp,
+  eşleşmiş, eşik Δ ≤ −0.15 nat + 6/6 işaret. **Teşhis: `val_inchunk`** ayrı
+  hesaplanır (araç öğrendi mi?). Sonda ikincil/betimleyici.
+  **Bu bir TARAMA deneyi** — n=6'da 6/6 için p=0.0156; "kanıtlandı" denmeyecek.
+
+  **DURMA KURALI (ön-kayıtlı, koşudan önce yazıldı):** kapı geçilmezse hat
+  **kapanır**; SİNYAL çıkarsa tek izinli devam ayrıştırma+güç koşusu ve
+  sonrası için **yeni karar** gerekir; TERS/SONUÇSUZ çıkarsa hat **kapanır**.
+  **Sert bütçe: bu hatta v4 dahil en fazla 2 koşu**, sonra yayın hattına dönülür.
+  Gerekçe: §30-§35 arası altı bölümün tamamı negatif ya da geçersiz ve her biri
+  "bir sonraki müdahale tutar" diye başladı.
+  Tam ön-kayıt RESULTS §35'te.
 
 ---
 

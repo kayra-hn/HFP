@@ -1955,64 +1955,110 @@ two levers should chain the state — and **neither breaks O(1)**, since both gr
    current association and writes the difference, overwriting instead of stacking).
    Already implemented; gave a 2× multi-seed gain on a key-update task (§13 era).
 
-**Design (v3).** `review_scripts/carry_curriculum.py` (train) + `matched_probe.py`
+### §35a — v3 was run and is recorded as an INVALID RUN, not a negative result
+
+Run 2026-08-01 on a Kaggle T4, 2 arms × 4 seeds, total wall time **833 s**. Two
+independent defects make it uninterpretable for the pre-registered question. Both
+are design errors on our side, recorded here rather than quietly superseded.
+
+**Defect 1 — the vehicle never reached the capability under study.** Matched-probe
+accuracy at K=0 (chance 3.3%):
+
+| arm | s0 | s1 | s2 | s3 | mean |
+|---|---|---|---|---|---|
+| baseline (`nu2`/additive) | 6.0 | 8.0 | 12.0 | 8.0 | **8.5%** |
+| treatment (`nu4`/delta) | 2.0 | 8.0 | 4.0 | 4.0 | **4.5%** |
+
+§26b measured **33.2%** at K=0 with the same probe. The whole of §35 asks why the
+state survives one boundary but not two; in this run it did not survive one. Every
+K∈{1,2,4} cell in both arms likewise sits in the chance band (2–8%).
+
+**Defect 2 — the primary endpoint was confounded.** The B-chunk labels built by
+`carry_example` (`carry_curriculum.py:126`, `:150`) contain **both** the P in-chunk
+pairs **and** the cross-chunk target. At P=4 that is 5 supervised tokens, 4 of them
+in-chunk — i.e. ~80% of the "cross-chunk validation loss" measured something local
+attention already solves. The observed baseline value of **2.2974** is exactly what
+a model with the carry at chance would produce: (4 × 2.02 + 3.40) / 5 = 2.30. The
+metric therefore could not distinguish "carry works" from "carry does nothing".
+The same confound is present in the `lossB(cross-chunk)` figure printed by the
+§26–§28 runs and should be read with that in mind.
+
+**A correction to an earlier claim in this section's drafting.** The `ESKI`
+(unmatched) probe returning 100% at K=0 in all 8 runs was briefly treated as a
+clean upper-bound arm. It is not: at K=0 that probe's sequence is literally
+`[tgt_k, v, tgt_k]`, three tokens, well inside `local_window=8`. It shows local
+attention works and says nothing about carry. **This run had no valid upper-bound
+arm.**
+
+**Root cause.** The v2 scope cut (CTX 256→128, 1200→600 steps, BS 8→4,
+CARRY_MAX 16→8, P 6→4) was justified against a *CPU* measurement of ~25 h. The
+run then moved to GPU and the cost was never re-measured. On a T4 the full §26b
+settings were affordable all along — the cut bought nothing and broke the vehicle.
+
+**Verdict: no information about the interference hypothesis.** This is an invalid
+run, not a null. Nothing is concluded in either direction.
+
+---
+
+**Design (v4).** `review_scripts/carry_curriculum.py` (train) + `matched_probe.py`
 (eval), orchestrated by `notebooks/chain_capacity_v35.ipynb`. **Two arms** —
-baseline (`dpfp_nu=2`, `additive`) vs treatment (`dpfp_nu=4`, `delta`) — × **4
-seeds** (0–3), `decay_mode='exp'` fixed. Reduced-cost settings retained from v2
-(CTX 128, 600 steps, BS 4, CARRY_MAX 8, `DIST_EVERY` 32) after the first attempt
-was measured at ~25 h on CPU; the baseline arm runs in the same sweep, so
-**within-run comparison is preserved** even though absolute numbers are not
-comparable to §26b.
+baseline (`dpfp_nu=2`, `additive`) vs treatment (`dpfp_nu=4`, `delta`) — × **6
+seeds** (0–5), `decay_mode='exp'` fixed. Vehicle settings restored to **§26b/§27/
+§28a exactly**: CTX 256, 1200 steps, BS 8, CARRY_MAX 16, P 6, `DIST_EVERY` 64.
+Estimated ~15–20 min per arm by scaling v3's measured 80 s/arm; to be confirmed
+against the first arm's actual time rather than assumed.
 
-**Primary endpoint:** **end-of-training cross-chunk validation loss at K=2**, in
-nats, **paired by seed** (treatment − baseline); lower is better. Two reference
-points, which are *not* the same number and were conflated in an earlier draft of
-this section: an untrained model sits at **ln(164) ≈ 5.10** (uniform over the
-vocabulary), while **ln(30) ≈ 3.40** is the loss of a model that has already
-learned the answer is one of the 30 value tokens but not *which* one. §26b's
-trained runs reached 1.75–2.15, i.e. well below 3.40. The verdict is computed on
-paired differences, so neither reference enters the criterion; they matter only
-for reading the absolute numbers. This is the low-variance endpoint §26b identified: a batch-averaged loss
-rather than a 30–50-trial accuracy. The measurement was fixed for this run — the
-previous implementation replicated a *single* example 8× (effective n=1) and wrote
-the number nowhere; it now averages **64 distinct carry examples** and is written
-to `{TAG}_valloss.csv`. Training is unchanged; only the post-training measurement.
-Because of this fix the value is not directly comparable to the single-example
-numbers printed by §26–§28 runs.
+**Vehicle-validity gate (checked before any verdict).** Baseline seed-mean
+matched-probe accuracy at K=0 must be **≥ 25%** (§26b: 33.2%; v3: 8.5%). If it is
+not, the run is declared **invalid** and nothing is written about the hypothesis.
+v3 lacked this gate; that is why it produced a number that looked like a result.
 
-The validation examples are drawn from a dedicated RNG stream seeded `12345+SEED`
-and independent of `dpfp_nu`/`write_rule`, so **both arms of a given seed are
-scored on the identical 64 examples** — the pairing is exact, not just nominal.
-The stream is restored afterwards, so `CC_VAL_N` does not shift the lifetime probe.
+**Primary endpoint:** **cross-chunk validation loss at K=2, computed on the target
+token alone** (`val_cross`), in nats, **paired by seed** (treatment − baseline);
+lower is better. The in-chunk term is computed separately as `val_inchunk` and
+reported as a **diagnostic** — it answers "did the vehicle learn anything at all"
+without contaminating the endpoint. Both come from one forward pass with two label
+masks; precedent for masking to the answer token is §33.
 
-**Secondary (descriptive, not decisive):** matched-probe `matched_acc` and
-`matched_logp` at K ∈ {0,1,2,4}, 50 trials (chance 3.3%). Reported with per-seed
-min–max, never as a bare mean.
+Reference points, distinct and previously conflated: an untrained model sits at
+**ln(164) ≈ 5.10** (uniform over the vocabulary); **ln(30) ≈ 3.40** is a model that
+has learned the answer is one of the 30 value tokens but not which. The verdict is
+computed on paired differences, so neither enters the criterion.
 
-**Pre-registered criteria (screening, n=4 paired).**
-- **SIGNAL:** paired mean Δ ≤ **−0.15 nat** *and* **4/4 seeds** favour treatment →
-  the interference lever measurably improves cross-boundary learning. This is
-  **not** "confirmed": at n=4 a sign test yields at best p=0.0625. The single
-  permitted follow-up is *attribution + power* — `nu4/additive` vs `nu2/delta`,
-  8–12 seeds, same primary endpoint.
-- **REVERSED:** paired mean Δ ≥ **+0.15 nat** *and* 0/4 seeds favour treatment →
-  capacity+delta actively hurts; the interference hypothesis is refuted in this
-  direction and the line closes.
-- **INCONCLUSIVE (not "null"):** anything else — |Δ| < 0.15 nat or split signs →
-  at this power the hypothesis is neither confirmed nor refuted. Per this
-  project's power rule, **"no effect" will not be written.** The decision is then
-  explicitly the author's: raise to 8–12 seeds, or park the line and move to the
-  read/addressing diagnostic (can a value written into the state be read back
-  *within* the same chunk vs *after* a boundary — separating "write is broken"
-  from "read is broken").
+Validation examples are drawn from a dedicated RNG stream seeded `12345+SEED`,
+independent of `dpfp_nu`/`write_rule`, so **both arms of a given seed are scored on
+the identical 64 examples** — the pairing is exact. The stream is restored
+afterwards, so `CC_VAL_N` does not shift the lifetime probe.
+
+**Secondary (descriptive):** matched-probe `matched_acc` and `matched_logp` at
+K ∈ {0,1,2,4}, 100 trials, chance 3.3%. Always with per-seed min–max.
+
+**Pre-registered criteria (screening, n=6 paired).**
+- **SIGNAL:** paired mean Δ ≤ **−0.15 nat** *and* **6/6 seeds** favour treatment.
+  Sign test at 6/6 gives p = 0.0156. Still a screen, not a confirmation.
+- **REVERSED:** paired mean Δ ≥ **+0.15 nat** *and* 0/6 seeds favour treatment.
+- **INCONCLUSIVE (not "null"):** anything else. Per this project's power rule,
+  **"no effect" will not be written.**
 
 The 0.15 nat threshold is taken from §28a's own refutation bar, not chosen here.
 
-**Discipline note.** Given this project's documented tendency to chase "one more
-experiment" after each negative (BEKLEYEN, roadmap §4), the **SIGNAL** branch is
-capped at exactly one follow-up, **REVERSED** closes the line, and
-**INCONCLUSIVE** is a decision point for the author rather than an automatic
-further arm.
+**STOPPING RULE — pre-registered, written before the run.** The author chose to
+defer the publication track and continue this line; this rule is the condition
+attached to that choice, agreed in advance while the outcome was unknown.
+
+- **Gate not passed** → the line **closes**. If §26b's 33% cannot be reproduced,
+  the obstacle is not interference and no further corrective arm is justified.
+- **SIGNAL** → exactly one follow-up is permitted: *attribution + power*
+  (`nu4/additive` vs `nu2/delta`, 8–12 seeds, same endpoint). Anything beyond that
+  requires a fresh, explicit decision — no automatic continuation.
+- **REVERSED or INCONCLUSIVE** → the line **closes**. No further experiment.
+- **Hard budget:** at most **2 runs** on this line including v4. When those are
+  spent, the publication track resumes regardless of outcome.
+
+Rationale: §30 through §35 are six consecutive sections on this line, every one of
+them negative or invalid, and each began with the expectation that the next
+intervention would work (BEKLEYEN, roadmap §3). A stopping rule cannot be written
+after the result is known.
 
 ## Reproduction
 

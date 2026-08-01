@@ -246,10 +246,22 @@ VAL_BS = 8
 # VAL_N'i degistirmek asagidaki omur sondasinin rastgeleligini KAYDIRMAZ.
 # (Eski surumde blok bir carry_example tuketiyordu; o yuzden sonda akisi bu
 # degisiklikten once/sonra birebir ayni degil.)
+# [§35 v4 DUZELTME — 2026-08-01] Yukaridaki "val_loss" TEK BASINA KIRLIYDI.
+# carry_example'in B chunk etiketleri (dense_chunk satir 126 + carry_example
+# satir 150) HEM chunk-ici P ciftini HEM cross-chunk hedefini iceriyor. P=4'te
+# denetlenen 5 token var, 4'u chunk-ici -> metrigin %80'i yerel attention'in
+# zaten cozdugu seyi olcuyor. v3 kosusunda taban 2.2974 dondu; tasima tamamen
+# sansta (3.40) ve chunk-iciler 2.02'de olsaydi ortalama (4*2.02+3.40)/5 = 2.30
+# cikardi -- AYNI SAYI. Yani metrik "tasima calisiyor" ile "hic calismiyor"
+# arasinda ayrim yapamiyordu.
+# Simdi tek forward'dan IKI kayip ayri hesaplanir:
+#   VAL_CROSS  = yalniz cross-chunk hedef tokeni  -> BIRINCIL
+#   VAL_INCHNK = yalniz chunk-ici ciftler          -> TESHIS (arac ogrendi mi?)
+# Emsal: §33'te graft recall loss'u yalniz cevap tokenlarina maskelenmisti.
 _val_rng = random.Random(12345 + SEED)          # olcum, egitim RNG'sinden AYRI
 _saved_state = random.getstate()
 random.setstate(_val_rng.getstate())
-_losses = []
+_losses, _cross, _inchnk = [], [], []
 with torch.no_grad():
     for _b0 in range(0, VAL_N, VAL_BS):
         n = min(VAL_BS, VAL_N - _b0)
@@ -262,18 +274,39 @@ with torch.no_grad():
             past = model(xf, past_key_values=past, use_cache=True).past_key_values
         xb = torch.tensor([e[3] for e in ex], device=DEV)
         yb = torch.tensor([e[4] for e in ex], device=DEV)
-        _losses.append(model(xb, labels=yb, past_key_values=past,
-                             use_cache=True).loss.item())
+        _out = model(xb, labels=yb, past_key_values=past, use_cache=True)
+        _losses.append(_out.loss.item())                  # karisik (geriye uyum)
+        # HF kaydirmasi: logits[:, :-1] <-> labels[:, 1:]
+        _sl = _out.logits[:, :-1, :].reshape(-1, _out.logits.size(-1))
+        _yc = torch.full_like(yb, -100); _yc[:, CTX - 1] = yb[:, CTX - 1]
+        _yi = yb.clone();                _yi[:, CTX - 1] = -100
+        _cross.append(Fn.cross_entropy(_sl, _yc[:, 1:].reshape(-1),
+                                       ignore_index=-100).item())
+        _inchnk.append(Fn.cross_entropy(_sl, _yi[:, 1:].reshape(-1),
+                                        ignore_index=-100).item())
 random.setstate(_saved_state)
-VAL_LOSS = float(np.mean(_losses))
-VAL_SEM = float(np.std(_losses, ddof=1) / np.sqrt(len(_losses))) if len(_losses) > 1 else float("nan")
-print(f"[{TAG}] egitim-sonu cross-chunk dogrulama loss (K={VAL_K}, n={VAL_N} farkli ornek): "
-      f"{VAL_LOSS:.4f} +/- {VAL_SEM:.4f} (batch-SEM) (sans ~3.40)")
+def _msem(xs):
+    m = float(np.mean(xs))
+    s = float(np.std(xs, ddof=1) / np.sqrt(len(xs))) if len(xs) > 1 else float("nan")
+    return m, s
+VAL_LOSS, VAL_SEM = _msem(_losses)
+VAL_CROSS, VAL_CROSS_SEM = _msem(_cross)
+VAL_INCHNK, VAL_INCHNK_SEM = _msem(_inchnk)
+print(f"[{TAG}] egitim-sonu dogrulama (K={VAL_K}, n={VAL_N} farkli ornek):")
+print(f"[{TAG}]   BIRINCIL cross-chunk       : {VAL_CROSS:.4f} +/- {VAL_CROSS_SEM:.4f}")
+print(f"[{TAG}]   TESHIS   chunk-ici         : {VAL_INCHNK:.4f} +/- {VAL_INCHNK_SEM:.4f}")
+print(f"[{TAG}]   (karisik, eski metrik)     : {VAL_LOSS:.4f} +/- {VAL_SEM:.4f}")
+print(f"[{TAG}]   referans: ln(30)=3.4012 (deger tokenlari arasinda sans), "
+      f"ln({VHI + 4})={float(np.log(VHI + 4)):.4f} (hicbir sey ogrenilmemis)")
 with open(f"{CKDIR}/{TAG}_valloss.csv", "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=["mode", "seed", "dpfp_nu", "write",
-                                      "val_k", "val_n", "val_loss", "val_sem"])
+                                      "val_k", "val_n", "val_loss", "val_sem",
+                                      "val_cross", "val_cross_sem",
+                                      "val_inchunk", "val_inchunk_sem"])
     w.writeheader()
     w.writerow(dict(mode=MODE, seed=SEED, dpfp_nu=DPFP_NU, write=WRITE,
+                    val_cross=round(VAL_CROSS, 4), val_cross_sem=round(VAL_CROSS_SEM, 4),
+                    val_inchunk=round(VAL_INCHNK, 4), val_inchunk_sem=round(VAL_INCHNK_SEM, 4),
                     val_k=VAL_K, val_n=VAL_N, val_loss=round(VAL_LOSS, 4),
                     val_sem=round(VAL_SEM, 4)))
 print(f"[{TAG}] yazildi: {CKDIR}/{TAG}_valloss.csv")
