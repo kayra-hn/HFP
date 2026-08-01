@@ -62,6 +62,24 @@ tamamen kendisinde (çift-lisanslama kapısı açık tutulmalı).
   yolunu kapatınca gerekçesi ortadan kalktı.
 
 ### Şu an koşan / bekleyen
+
+- **AKTİF: §29b** (`notebooks/parallel_cubic_v29.ipynb`) — `parallel_cubic`'in
+  kalite deneyi. 3 kol (exp / cubic sıralı / parallel_cubic) × 16 eşleşmiş seed,
+  seed-major. Birincil metrik `val_cross`. Ön-kayıt RESULTS §29b'de.
+  **Stratejik gerekçe:** `cubic_flux` bu projedeki **tek** prior-art olmayan
+  mimari öğe (O(1) state, DPFP, delta, gated decay, graft — hepsinin sahibi
+  başkası). Kazandığı rejim = seyrek-yazım/uzun-ömür = cihaz-içi kişisel hafıza
+  rejimi (§26). Raf koşullarından #1 §29 kapı testiyle kapandı, #2 aynı
+  değişiklikle açılıyor, #3 (LM ölçeğinde tekrar) hiç koşulmadı.
+  **Uyarı:** bu koşu §28a'yı temiz metrikte yeniden ölçüyor; §28a'nın etkisi
+  zayıflayabilir. Ön-kayda öyle yazıldı.
+
+- **§35 — TERK EDİLDİ (2026-08-01), kapanmadı.** v4 ön-kaydı yazıldı ve
+  başlatıldı, **hiçbir v4 sonucu görülmeden** kullanıcı tarafından durduruldu.
+  Karar stratejik, ampirik değil — hiçbir veri kararı etkilemedi, öyle kaydedildi.
+  v4 ön-kaydı, durma kuralı ve 2-koşu bütçesi olduğu gibi duruyor; hat yeniden
+  açılırsa geçerli. §35a'nın geçersizlik bulguları (araç eşiğin altında,
+  metrik kirli) her gelecek denemede geçerli.
 - **§35a — v3 KOŞULDU ve GEÇERSİZ (2026-08-01).** Negatif sonuç DEĞİL, geçersiz
   koşu. İki bağımsız kusur: (1) araç §26b yeteneğini üretemedi — taban K=0'da
   **%8.5**, §26b'de %33.2; bir sınırı geçemeyen modelde "neden ikinciyi

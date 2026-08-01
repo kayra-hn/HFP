@@ -1403,13 +1403,68 @@ T1 being bit-exact establishes that the block-frozen form *reduces exactly* to
 sequential cubic in the limit, so the implementation is correct and the
 approximation is controlled by `rec_block`.
 
-**Status: the quality experiment was NOT run.** The planned n=16 paired comparison
-(does parallel_cubic retain §28a's +0.484 nat advantage?) never executed — work
-moved to the memory line (§30) and cubic was subsequently shelved (BEKLEYEN #21).
-Recorded as unfinished rather than omitted. Anyone resuming: the notebook is ready,
-the gate passes, only cells 3-4 need running. Note also that the 1.16× speed-up is
-modest because both modes share the O(m²) intra-block einsum; the real gain is the
-removal of the custom sequential op (un-shelving condition #1), not throughput.
+**Status at the time of writing: the quality experiment was NOT run.** Work moved to
+the memory line (§30) and cubic was subsequently shelved (BEKLEYEN #21). Recorded as
+unfinished rather than omitted. Note also that the 1.16× speed-up is modest because
+both modes share the O(m²) intra-block einsum; the real gain is the removal of the
+custom sequential op (un-shelving condition #1), not throughput.
+
+## 29b. parallel_cubic — quality experiment (pre-registered, 2026-08-01)
+
+*Written before the run. This section is the authoritative pre-registration; the
+notebook markdown is a convenience copy. The criteria previously lived only in
+`notebooks/parallel_cubic_v29.ipynb`, which under this project's own rule does not
+count as pre-registration — corrected here before running.*
+
+**Why now.** `cubic_flux` is the only architectural element in this project that is
+not prior art: linear/O(1) state, DPFP, the delta rule, gated decay and the graft
+paradigm all have prior owners, and are attributed as such. Cubic's validated
+advantage (§28a) is specific to the **sparse-write, long-lived** regime — which is
+the on-device personal-memory regime (§26). Un-shelving condition #1 is already
+satisfied (§29 gate, bit-exact); this experiment tests whether the parallel form
+keeps the advantage that made cubic worth shipping.
+
+**Design.** Vehicle identical to §28a: `carry_curriculum.py`, CARRY_MAX 16, CTX 256,
+1200 steps, BS 8, P 6, `DIST_EVERY` 64, default η. **Three arms** — `exp`,
+`cubic_flux_chunked` (sequential), `parallel_cubic` — **paired by seed**, seeds
+0–15 (n=16), run **seed-major** so that an interrupted session still yields complete
+matched triples. Per-run wall time is unknown at §26b settings; the notebook prints a
+projection after the first arm and the sweep is split by seed range if it exceeds the
+session limit. No time estimate is asserted here.
+
+**Primary endpoint:** cross-chunk validation loss at K=2 computed **on the target
+token alone** (`val_cross`), paired by seed. **Secondary:** the mixed metric
+(`val_loss`) for comparability with §28a, and `val_inchunk` as a vehicle diagnostic.
+
+**A consequence that must be stated in advance.** §28a's headline (+0.484 nat,
+13/16 seeds, p = 0.0124) was measured on the **mixed** metric, which §35a showed to
+be ~6/7 in-chunk supervision at P=6. This run therefore also re-measures §28a on a
+clean endpoint. **§28a's effect may shrink or vanish.** If it does, that is recorded
+as a correction to §28a, not buried.
+
+**Internal reference, not the external one.** Retention is computed against the
+`cubic(sequential) − exp` gap **measured in this same run**, not against §28a's
++0.484. The external number is reported as a cross-check only. Using a figure from a
+different metric and a different run as the denominator would be a false comparison.
+
+**Vehicle-validity gate.** If `cubic(sequential) − exp` is not positive with p < 0.05
+on the primary endpoint in this run, there is no advantage to retain and **no verdict
+is issued about `parallel_cubic`**. That outcome is a finding about §28a and is
+recorded as such.
+
+**Pre-registered criteria** (conditional on the gate passing; retention = parallel's
+gap over exp divided by sequential cubic's gap over exp, primary endpoint):
+- **UNSHELVED:** retention **≥ 70%** *and* p < 0.05 → un-shelving conditions #1 and
+  #2 are closed; the only remaining condition is #3, replication of the sparse-regime
+  advantage at LM scale.
+- **PARTIAL:** retention 30–70% → adaptivity carries part of the benefit and the
+  closed loop carries part; both are documented and the shelf decision is deferred.
+- **FAILED:** retention < 30% or p ≥ 0.05 → the gain was specific to the closed-loop
+  feedback; `parallel_cubic` is rejected and cubic stays shelved.
+
+**Note on the physics.** `cubic_flux` was motivated by the author's own work in
+another field. Per `AGENTS.md`, that origin is a derivation story and not evidence:
+the claim stands or falls entirely on the measurements in §28a and here.
 
 ## 30. Memory-organ capability test (pre-registered)
 
@@ -2059,6 +2114,25 @@ Rationale: §30 through §35 are six consecutive sections on this line, every on
 them negative or invalid, and each began with the expectation that the next
 intervention would work (BEKLEYEN, roadmap §3). A stopping rule cannot be written
 after the result is known.
+
+### §35 — ABANDONED before v4 produced results (2026-08-01)
+
+v4 was pre-registered and started, then **stopped by the author before any v4 result
+was seen**, in favour of §29b. Recorded rather than deleted, because a pre-registered
+experiment that is dropped silently makes the remaining record selective.
+
+**The reason is strategic, not empirical.** No v4 data influenced this decision — the
+run had not reported. The reasoning: §35 works on the *interference* behaviour of an
+O(1) recurrent state, and that primitive is prior art (linear attention, RWKV, Mamba,
+DeltaNet, GLA). `cubic_flux` is the one element of this project that is not, its
+validated advantage sits in the regime the author actually targets, and two of its
+three un-shelving conditions are already met while the third has never been run. The
+author redirected to the differentiated line.
+
+**Status: OPEN, not closed.** The v4 pre-registration above stands unchanged and may
+be run later; the stopping rule and the 2-run budget attach to it whenever it
+resumes. §35a's invalid-run findings (vehicle below §26b capability, confounded
+endpoint) remain valid and must be honoured by any future attempt.
 
 ## Reproduction
 
