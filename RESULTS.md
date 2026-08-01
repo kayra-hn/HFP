@@ -1372,6 +1372,45 @@ ideally also (iii) replication of the sparse-regime advantage at LM scale, since
 temporary: the target product regime (personal memory = sparse writes) is cubic's
 home, so this is a deployment-engineering blocker, not a dead end.
 
+## 29. parallel_cubic — removing the sequential z-scan (implementation verified,
+experiment NOT run)
+
+**Motivation.** §28b shelved cubic for engineering reasons, the first being that
+λ_t = 1/√(1+2η z_t²) depends on the *state*, forcing a **sequential** z-scan that
+cannot be parallelised and is a custom op (blocking mobile export). Un-shelving
+condition #1 was a parallel formulation.
+
+**What was built.** `decay_mode="parallel_cubic"` in `hfp_bulk_state.py`:
+λ is computed from the **true z at each block start** and held constant within the
+block ("block-frozen λ"), so the intra-block computation collapses to the same
+parallel machinery `exp` uses; only the inter-block carry stays sequential — i.e.
+exactly the parallelism structure of exp/GLA. (An earlier open-loop-proxy design
+was discarded: a fixed-λ occupancy proxy overshoots the true state by ~1000× when
+λ₀→1, collapsing λ and producing NaNs. That failure and its cause are documented in
+a comment block in `hfp_bulk_state.py`.)
+
+**Verification gate — run, and passed** (`notebooks/parallel_cubic_v29.ipynb`):
+
+| test | result |
+|---|---|
+| T1: `rec_block=1` ⇒ identical to sequential `cubic_flux_chunked` | **max abs diff = 0.000e+00** (bit-exact) |
+| T2: `rec_block=32` approximation error | 1.372e-03 (≈1.03% relative) |
+| T3: finite loss, `log_eta` receives gradient | pass |
+| T4: L=1024, no NaN | pass |
+| T5: speed (B=4, L=512, CPU) | cubic 119.6 ms → **parallel_cubic 103.0 ms (1.16×)**; exp 78.0 ms |
+
+T1 being bit-exact establishes that the block-frozen form *reduces exactly* to
+sequential cubic in the limit, so the implementation is correct and the
+approximation is controlled by `rec_block`.
+
+**Status: the quality experiment was NOT run.** The planned n=16 paired comparison
+(does parallel_cubic retain §28a's +0.484 nat advantage?) never executed — work
+moved to the memory line (§30) and cubic was subsequently shelved (BEKLEYEN #21).
+Recorded as unfinished rather than omitted. Anyone resuming: the notebook is ready,
+the gate passes, only cells 3-4 need running. Note also that the 1.16× speed-up is
+modest because both modes share the O(m²) intra-block einsum; the real gain is the
+removal of the custom sequential op (un-shelving condition #1), not throughput.
+
 ## 30. Memory-organ capability test (pre-registered)
 
 Everything in the "memory co-processor" product framing rests on a capability that
@@ -1805,6 +1844,12 @@ a memory-first architecture rather than a graft — a separate programme.
 
 ## 32. Delta write rule for cross-boundary storage (pre-registered)
 
+> **Status: NOT RUN.** This arm was prepared (notebook parameter `WRITE_RULE`,
+> checkpoint lineage `…D`) but never executed: §33a/§34a closed the graft route to
+> a memory organ, which removed its rationale (a write-rule change cannot help if
+> nothing reaches the state at all). Kept on record as a pre-registration that was
+> superseded, not as a result.
+
 Motivated by the project's own oldest finding — **"the memory is
 interference-limited, not decay-limited"** (README / GPU_ROADMAP §0). The delta
 rule exists precisely to remove interference: it reads the current association and
@@ -1842,6 +1887,68 @@ probe, gaps 0–3 — inside the trained range):
   confirms K2's LM-based choice and closes the write-rule lever.
 - Guard: PPL and cache-present needle are reported alongside; if delta buys memory
   at a real LM cost, the trade-off is stated explicitly rather than hidden.
+
+## 35. Chaining across boundaries: capacity × write rule (pre-registered)
+
+*Written before the run. This section is the authoritative pre-registration; the
+notebook markdown and roadmap are convenience copies.*
+
+**Why this experiment.** §34a closed the *graft* route to a memory organ. But the
+small-scale HFP model — which has its **own trainable projections** — is not at
+zero: on the matched probe it reaches **33–53% across one chunk boundary (K=0)**
+and falls to chance by K=2 (§26b). So the mechanism *works but does not chain*.
+That is a sharper and far cheaper question than anything available in the graft,
+and it runs without a GPU-scale budget.
+
+**Central question:** why does the state survive one boundary but not two?
+
+**Hypothesis — taken from this project's own findings, not invented here.** The
+memory is **interference-limited, not decay-limited** (README/GPU_ROADMAP §0), and
+this was independently re-confirmed in §27a: *lengthening* cubic's plateau made
+retention **worse**, because a channel that forgets less accumulates more
+interference. Filler chunks write a distractor key-value every `DIST_EVERY` tokens;
+after two chunks the target is buried. If interference is the binding constraint,
+two levers should chain the state — and **neither breaks O(1)**, since both grow a
+*constant*, not something that scales with context:
+
+1. **State capacity** — `dpfp_nu` 2→4 doubles `key_dim` (256→512), diluting
+   interference. (Note: `bulk_dim` does **not** affect the memory; it is an FFN
+   parameter. This was checked in the code, not assumed.)
+2. **Write rule** — `additive` (accumulates, interferes) → `delta` (reads the
+   current association and writes the difference, overwriting instead of stacking).
+   Already implemented; gave a 2× multi-seed gain on a key-update task (§13 era).
+
+**Design.** `review_scripts/carry_curriculum.py` (train) + `matched_probe.py`
+(eval), orchestrated by `notebooks/chain_capacity_v35.ipynb`.
+2×2 arms — (`dpfp_nu` ∈ {2,4}) × (`additive`, `delta`) — × 2 seeds, evaluated at
+K ∈ {0,1,2,4}, 50 trials, `decay_mode='exp'` fixed so the only variables are
+capacity and write rule. Reduced-cost settings (CTX 128, 600 steps, BS 4,
+CARRY_MAX 8) after the first attempt was measured at ~25 h on CPU; the baseline arm
+runs in the same sweep, so **within-run comparison is preserved** even though
+absolute numbers are not comparable to §26b.
+
+**Primary endpoint:** matched-probe accuracy at **K=2** (the distance where the
+baseline currently sits at chance). Chance = 3.3%.
+**Secondary:** K=0 (regression check) and end-of-training cross-chunk loss.
+
+**Pre-registered criteria.**
+- **CHAINING UNLOCKED:** some arm reaches **≥30%** at K=2 **and** shows no material
+  regression at K=0 (≤10 points below baseline) → interference hypothesis confirmed;
+  the lever is identified and the next step is range extension (K=8,16,32).
+- **PARTIAL:** best arm 10–30% at K=2 → direction right, magnitude insufficient;
+  more aggressive capacity (`dpfp_nu`=8) is then justified — but only this once.
+- **NO EFFECT:** all arms <10% at K=2 → interference is *also* not the binding
+  constraint. The limit would then lie in the **read/addressing path**, and the next
+  probe is diagnostic rather than corrective: can a value written into the state be
+  read back *within* the same chunk (write path intact?) versus *after* a boundary
+  (carry intact?) — separating "write is broken" from "read is broken" before any
+  further design change.
+
+**Discipline note.** Two of the three outcomes lead to either closing this line or
+one further narrowly-scoped experiment. Given this project's documented tendency to
+chase "one more experiment" after each negative (BEKLEYEN, roadmap §4), the
+*partial* branch is explicitly capped at a single follow-up, and the *no effect*
+branch is diagnostic-only, not another corrective arm.
 
 ## Reproduction
 
