@@ -62,11 +62,19 @@ tamamen kendisinde (çift-lisanslama kapısı açık tutulmalı).
   yolunu kapatınca gerekçesi ortadan kalktı.
 
 ### Şu an koşan / bekleyen
-- **§35** (`notebooks/chain_capacity_v35.ipynb`): küçük-ölçek modelde
+- **§35 v3** (`notebooks/chain_capacity_v35.ipynb`): küçük-ölçek modelde
   **kapasite × yazım kuralı** taraması. Merkezi soru: state neden **bir** sınırı
-  geçiyor da **ikincisini** geçemiyor? (§26b: K=0'da %33-53, K=2'de şansa düşüyor.)
-  2×2 (`dpfp_nu` 2/4 × additive/delta) × 2 seed, K ∈ {0,1,2,4}.
-  **Birincil kriter: K=2'de ≥%30 (şans %3.3).**
+  geçiyor da **ikincisini** geçemiyor? (§26b, `exp` kolu: K=0'da **%33.2**, seed
+  aralığı %8.5–69.5; K=2'de şansa düşüyor. **Dikkat:** eskiden bu belgede yazan
+  "%33-53" yanlıştı — 33.2 `exp` kolunun, 53.4 `cubic` kolunun ortalamasıdır;
+  §35 `exp` sabitliyor.)
+  **v2 tasarımı güç yetersizliğinden iptal edildi** (2 seed + mutlak %30 eşiği,
+  §26b'nin 6 seed'de bile ayıramadığı bir ölçümde). v3: **2 kol × 4 seed**
+  (taban nu2/additive vs nu4/delta), bütçe aynı (8 koşu).
+  **Birincil metrik: eşleşmiş cross-chunk doğrulama kaybı (nat), eşik Δ ≤ −0.15
+  nat + 4/4 işaret.** Sonda doğruluğu ikincil/betimleyici.
+  **Bu bir TARAMA deneyi** — n=4'te işaret testi en iyi p=0.0625; "kanıtlandı"
+  denmeyecek. Gerekçe ve tam ön-kayıt RESULTS §35'te.
 
 ---
 
@@ -133,7 +141,8 @@ tamamen kendisinde (çift-lisanslama kapısı açık tutulmalı).
 
 | ne zaman | soru |
 |---|---|
-| §35 sonrası | zincirleme açıldı mı? (K=2 ≥%30) |
-| §35 açılırsa | menzil genişletme; küçük modelde mi devam, graft'a mı taşı? |
-| §35 açılmazsa | sınır okuma/adresleme yolunda → "yazma mı okuma mı bozuk" sondası |
+| §35 sonrası | sinyal var mı? (eşleşmiş Δ ≤ −0.15 nat, 4/4 seed) |
+| §35 sinyal verirse | tek izinli devam: ayrıştırma + güç (nu4/additive vs nu2/delta, 8-12 seed) |
+| §35 ters çıkarsa | girişim hipotezi çürüdü, hat kapanır |
+| §35 sonuçsuz çıkarsa | KARAR Kayrahan'ın: 8-12 seed'e çıkar mı, yoksa park edip yayına/okuma-yolu teşhisine mi geçer? ("etki yok" YAZILMAZ) |
 | istenirse | yayın planını cepten çıkar (yeni deney gerektirmiyor; tek borç 1.043×'in çok-seed replikasyonu) |

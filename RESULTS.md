@@ -1893,12 +1893,49 @@ probe, gaps 0–3 — inside the trained range):
 *Written before the run. This section is the authoritative pre-registration; the
 notebook markdown and roadmap are convenience copies.*
 
+> **Revision v3 (2026-08-01) — the v2 design was underpowered and is superseded.**
+> Recorded openly rather than silently replaced, per the erratum policy.
+>
+> **What was wrong.** v2 specified 4 arms × **2 seeds**, with the primary endpoint
+> being matched-probe accuracy at K=2 against **absolute** thresholds (≥30% /
+> 10–30% / <10%). Those thresholds were calibrated on §26b — which used **6 seeds
+> and 200 trials** and *still* failed its pre-registered separation bar, with the
+> exp arm spanning **8.5–69.5% across seeds at K=0**. §26b's own recorded lesson
+> was that settling this needs "12–20 seeds **or** a lower-variance endpoint."
+> v2 went the other way: fewer seeds, fewer trials, and a *more* decisive verdict.
+> With that seed variance, a 2-seed mean cannot distinguish a real null from noise,
+> so the near-certain "NO EFFECT" outcome would have closed the interference
+> hypothesis on an artifact of sample size — exactly what this project's own
+> power rule ("if both arms are at chance, report *inconclusive*, not *null*")
+> forbids.
+>
+> **Also corrected:** v2 (and the roadmap and `DEVIR.md`) cited the small-scale
+> model as reaching "33–53%" at K=0 as if that were one configuration's range. It
+> is not: **33.2% is the `exp` arm mean and 53.4% is the `cubic` arm mean** in
+> §26b's 6-seed table. §35 fixes `decay_mode='exp'`, so the correct baseline
+> expectation here is **~33%, with a seed range of 8.5–69.5%**.
+>
+> **v3 fix — budget-neutral (still 8 runs):** trade arms for seeds and switch to a
+> low-variance endpoint.
+>
+> | | v2 | v3 |
+> |---|---|---|
+> | arms | 4 (2×2) | **2** (baseline vs strongest contrast) |
+> | seeds | 2 | **4** |
+> | primary endpoint | matched-probe accuracy at K=2 (%) | **cross-chunk validation loss** (nat, paired by seed) |
+> | criterion | absolute ≥30% | **paired Δ ≤ −0.15 nat + sign consistency** |
+> | status of the claim | confirmatory | **screening** |
+>
+> **Cost of merging the arms, stated plainly:** if a signal appears, this run
+> cannot say whether capacity or the write rule produced it. Separating them is the
+> follow-up. This is a deliberate trade: detection has to come before attribution.
+
 **Why this experiment.** §34a closed the *graft* route to a memory organ. But the
 small-scale HFP model — which has its **own trainable projections** — is not at
-zero: on the matched probe it reaches **33–53% across one chunk boundary (K=0)**
-and falls to chance by K=2 (§26b). So the mechanism *works but does not chain*.
-That is a sharper and far cheaper question than anything available in the graft,
-and it runs without a GPU-scale budget.
+zero: on the matched probe its `exp` arm reaches **33.2% (seed range 8.5–69.5%)
+across one chunk boundary (K=0)** and falls to chance by K=2 (§26b). So the
+mechanism *works but does not chain*. That is a sharper and far cheaper question
+than anything available in the graft, and it runs without a GPU-scale budget.
 
 **Central question:** why does the state survive one boundary but not two?
 
@@ -1918,37 +1955,58 @@ two levers should chain the state — and **neither breaks O(1)**, since both gr
    current association and writes the difference, overwriting instead of stacking).
    Already implemented; gave a 2× multi-seed gain on a key-update task (§13 era).
 
-**Design.** `review_scripts/carry_curriculum.py` (train) + `matched_probe.py`
-(eval), orchestrated by `notebooks/chain_capacity_v35.ipynb`.
-2×2 arms — (`dpfp_nu` ∈ {2,4}) × (`additive`, `delta`) — × 2 seeds, evaluated at
-K ∈ {0,1,2,4}, 50 trials, `decay_mode='exp'` fixed so the only variables are
-capacity and write rule. Reduced-cost settings (CTX 128, 600 steps, BS 4,
-CARRY_MAX 8) after the first attempt was measured at ~25 h on CPU; the baseline arm
-runs in the same sweep, so **within-run comparison is preserved** even though
-absolute numbers are not comparable to §26b.
+**Design (v3).** `review_scripts/carry_curriculum.py` (train) + `matched_probe.py`
+(eval), orchestrated by `notebooks/chain_capacity_v35.ipynb`. **Two arms** —
+baseline (`dpfp_nu=2`, `additive`) vs treatment (`dpfp_nu=4`, `delta`) — × **4
+seeds** (0–3), `decay_mode='exp'` fixed. Reduced-cost settings retained from v2
+(CTX 128, 600 steps, BS 4, CARRY_MAX 8, `DIST_EVERY` 32) after the first attempt
+was measured at ~25 h on CPU; the baseline arm runs in the same sweep, so
+**within-run comparison is preserved** even though absolute numbers are not
+comparable to §26b.
 
-**Primary endpoint:** matched-probe accuracy at **K=2** (the distance where the
-baseline currently sits at chance). Chance = 3.3%.
-**Secondary:** K=0 (regression check) and end-of-training cross-chunk loss.
+**Primary endpoint:** **end-of-training cross-chunk validation loss at K=2**, in
+nats, **paired by seed** (treatment − baseline). Chance ≈ 3.40 nat; lower is
+better. This is the low-variance endpoint §26b identified: a batch-averaged loss
+rather than a 30–50-trial accuracy. The measurement was fixed for this run — the
+previous implementation replicated a *single* example 8× (effective n=1) and wrote
+the number nowhere; it now averages **64 distinct carry examples** and is written
+to `{TAG}_valloss.csv`. Training is unchanged; only the post-training measurement.
+Because of this fix the value is not directly comparable to the single-example
+numbers printed by §26–§28 runs.
 
-**Pre-registered criteria.**
-- **CHAINING UNLOCKED:** some arm reaches **≥30%** at K=2 **and** shows no material
-  regression at K=0 (≤10 points below baseline) → interference hypothesis confirmed;
-  the lever is identified and the next step is range extension (K=8,16,32).
-- **PARTIAL:** best arm 10–30% at K=2 → direction right, magnitude insufficient;
-  more aggressive capacity (`dpfp_nu`=8) is then justified — but only this once.
-- **NO EFFECT:** all arms <10% at K=2 → interference is *also* not the binding
-  constraint. The limit would then lie in the **read/addressing path**, and the next
-  probe is diagnostic rather than corrective: can a value written into the state be
-  read back *within* the same chunk (write path intact?) versus *after* a boundary
-  (carry intact?) — separating "write is broken" from "read is broken" before any
-  further design change.
+The validation examples are drawn from a dedicated RNG stream seeded `12345+SEED`
+and independent of `dpfp_nu`/`write_rule`, so **both arms of a given seed are
+scored on the identical 64 examples** — the pairing is exact, not just nominal.
+The stream is restored afterwards, so `CC_VAL_N` does not shift the lifetime probe.
 
-**Discipline note.** Two of the three outcomes lead to either closing this line or
-one further narrowly-scoped experiment. Given this project's documented tendency to
-chase "one more experiment" after each negative (BEKLEYEN, roadmap §4), the
-*partial* branch is explicitly capped at a single follow-up, and the *no effect*
-branch is diagnostic-only, not another corrective arm.
+**Secondary (descriptive, not decisive):** matched-probe `matched_acc` and
+`matched_logp` at K ∈ {0,1,2,4}, 50 trials (chance 3.3%). Reported with per-seed
+min–max, never as a bare mean.
+
+**Pre-registered criteria (screening, n=4 paired).**
+- **SIGNAL:** paired mean Δ ≤ **−0.15 nat** *and* **4/4 seeds** favour treatment →
+  the interference lever measurably improves cross-boundary learning. This is
+  **not** "confirmed": at n=4 a sign test yields at best p=0.0625. The single
+  permitted follow-up is *attribution + power* — `nu4/additive` vs `nu2/delta`,
+  8–12 seeds, same primary endpoint.
+- **REVERSED:** paired mean Δ ≥ **+0.15 nat** *and* 0/4 seeds favour treatment →
+  capacity+delta actively hurts; the interference hypothesis is refuted in this
+  direction and the line closes.
+- **INCONCLUSIVE (not "null"):** anything else — |Δ| < 0.15 nat or split signs →
+  at this power the hypothesis is neither confirmed nor refuted. Per this
+  project's power rule, **"no effect" will not be written.** The decision is then
+  explicitly the author's: raise to 8–12 seeds, or park the line and move to the
+  read/addressing diagnostic (can a value written into the state be read back
+  *within* the same chunk vs *after* a boundary — separating "write is broken"
+  from "read is broken").
+
+The 0.15 nat threshold is taken from §28a's own refutation bar, not chosen here.
+
+**Discipline note.** Given this project's documented tendency to chase "one more
+experiment" after each negative (BEKLEYEN, roadmap §4), the **SIGNAL** branch is
+capped at exactly one follow-up, **REVERSED** closes the line, and
+**INCONCLUSIVE** is a decision point for the author rather than an automatic
+further arm.
 
 ## Reproduction
 

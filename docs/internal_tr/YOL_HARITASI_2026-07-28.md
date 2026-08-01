@@ -13,7 +13,15 @@ Sezgisel cevap "sıfırdan büyük model eğit" olurdu. **Yanlış olur:** pahal
 ve öğreteceği şey belirsiz. Doğru başlangıç noktası zaten elimizde:
 
 **Küçük-ölçek HFP modeli (kendi eğitilebilir projeksiyonlarıyla) TEK sınır
-geçişinde %33-53 alıyor, iki sınırda şansa düşüyor** (§26b).
+geçişinde ortalama %33.2 alıyor (seed aralığı %8.5–69.5), iki sınırda şansa
+düşüyor** (§26b, `exp` kolu).
+
+> **Düzeltme (2026-08-01):** bu satır önce "%33-53" diyordu, sanki tek bir
+> konfigürasyonun aralığıymış gibi. Değil: **%33.2 `exp`, %53.4 `cubic`** kolunun
+> ortalaması. §35 `decay_mode='exp'` sabitliyor → doğru taban ~%33.
+> Ayrıca §26b'nin asıl dersi bu ortalama değil, **seed varyansı**: 6 seed'de
+> %8.5–69.5. Bu yüzden §35 v3'te birincil metrik sonda doğruluğu değil,
+> düşük-varyanslı **cross-chunk doğrulama kaybı** oldu (bkz. RESULTS §35).
 
 Yani mekanizma **çalışıyor ama zincirlenmiyor**. Bu, graft'ın %0'ından çok daha
 bilgilendirici bir başlangıç: sorun "hiç yok" değil, "bir adımdan sonra kayboluyor".
@@ -37,22 +45,29 @@ O halde zincirlemeyi açacak iki kaldıraç:
 - **Delta yazım** (`write_rule='delta'`) → eski değeri siler, üst üste biriktirmez.
   Kodda hazır; anahtar-güncelleme görevinde 2× kazandırmıştı.
 
-**Tasarım.** `carry_curriculum.py` + `matched_probe.py`, 2×2 (state küçük/büyük ×
-additive/delta), 4-6 seed, K ∈ {0,1,2,4,8}. Birincil metrik: **K=2'de eşleşmiş
-sonda doğruluğu** (şu an şansa düşen nokta). İkincil: K=0 (regresyon var mı?) ve
-eğitim kaybı.
+**Tasarım (v3 — otorite ön-kayıt RESULTS §35).** `carry_curriculum.py` +
+`matched_probe.py`, **2 kol × 4 seed**: taban (`nu=2`/additive) vs
+(`nu=4`/delta), K ∈ {0,1,2,4}.
+**Birincil metrik:** **eşleşmiş cross-chunk doğrulama kaybı** (nat, K=2, seed
+başına 64 farklı örnek). **İkincil/betimleyici:** K=2 ve K=0 sonda doğruluğu.
 
-**Ön-kayıtlı kriter:**
-- **ZİNCİRLEME AÇILDI:** bir kol K=2'de ≥%30 (şans %3.3) VE K=0'da regresyon yok
-  → girişim hipotezi doğrulandı; kaldıraç belli, menzil genişletmeye geçilir.
-- **KISMİ:** K=2'de %10-30 → yön doğru, daha agresif kapasite denenir.
-- **ETKİ YOK:** her kol K=2'de <%10 → girişim de değil; sınır daha temel
-  (okuma yolu / adresleme). O zaman mimari soru yeniden formüle edilir.
+**Ön-kayıtlı kriter (tarama, n=4 eşleşmiş):**
+- **SİNYAL:** eşleşmiş ortalama Δ ≤ **−0.15 nat** VE 4/4 seed aynı yönde
+  → tek izinli devam: ayrıştırma + güç (nu4/additive vs nu2/delta, 8-12 seed).
+- **TERS:** Δ ≥ +0.15 nat VE 0/4 → girişim hipotezi bu yönde çürüdü, hat kapanır.
+- **SONUÇSUZ:** diğer her şey → "etki yok" YAZILMAZ. Karar Kayrahan'ın:
+  8-12 seed'e çıkmak ya da hattı park edip okuma/adresleme teşhisine geçmek.
+
+**v2 neden iptal edildi:** 2 seed + mutlak %30 eşiği. §26b aynı aracı 6 seed /
+200 denemeyle koştu ve K=0'da %8.5–69.5 yayılım ölçüp "yetersiz güç" dedi.
+Daha az seed'le daha kesin hüküm vermek, projenin kendi **güç kontrolü** kuralını
+ihlal ederdi. v3 bütçe-nötr: kol sayısı seed'e takas edildi (yine 8 koşu).
 
 **Maliyet (DÜZELTİLDİ — ilk tahmin yanlıştı):** CPU'da taban kol 1200 adımda
-~95 dk sürdü, `nu=8` daha da yavaş; 16 kol ~25 saat = Kaggle'ın 12 saatine sığmıyor.
-v2'de kapsam kısıldı (CTX 128, 600 adım, BS 4, 2 seed, nu=4) ve **GPU (T4)**
-kullanılıyor → toplam ~1-2 saat.
+~95 dk sürdü; ilk sürüm ~25 saat = Kaggle'ın 12 saatine sığmıyordu. v2'de kapsam
+kısıldı (CTX 128, 600 adım, BS 4, CARRY_MAX 8) ve **GPU (T4)** kullanılıyor.
+v3 koşu sayısını değiştirmedi. **Süre ölçülmeden tahmin edilmeyecek** — ilk kolun
+100 adımını ölç, oradan çarp.
 
 ---
 

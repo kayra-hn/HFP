@@ -51,7 +51,10 @@ KULLANIM
   python review_scripts/carry_curriculum.py <mode> <seed> [train_budget_sn]
   Env: CC_CARRY_MAX=16   CC_STEPS=1200   CC_CTX=256   CC_P=6
        CC_GAPS="256,1024,4096,16384"  CC_TRIALS=30  HFP_CKPT_DIR=checkpoints
+       CC_DPFP_NU=2  CC_WRITE=additive  CC_BS=8  CC_DIST_EVERY=64
+       CC_VAL_N=64  CC_VAL_K=2   [§35] egitim-sonu cross-chunk dogrulama loss'u
 Cikti: {CKDIR}/carry_results.txt + {CKDIR}/carryv1_{mode}_s{seed}.csv
+       + {CKDIR}/carryv1_{mode}_s{seed}_valloss.csv  [§35 birincil metrik]
 """
 import os
 CKDIR = os.environ.get("HFP_CKPT_DIR", "checkpoints")
@@ -227,16 +230,53 @@ torch.save(dict(m=model.state_dict(), o=opt.state_dict(), s=sch.state_dict(),
 print(f"[{TAG}] egitim tamam -> checkpoint kaydedildi: {CKPT}")
 
 # [PLATO KORUMASI] cross-chunk gorevi ogrenilmediyse kiyas gecersiz
+#
+# [§35 DUZELTME — 2026-08-01] Onceki surum TEK ornegi 8 kez kopyaliyordu
+# (`[a]*8`), yani batch 8 gorunuyordu ama etkin ornek sayisi 1'di; olcum
+# ornek-secimi gurultusune tamamen acikti ve hicbir dosyaya yazilmiyordu.
+# Simdi VAL_N farkli ornek uzerinden ortalanir ve CSV'ye yazilir. Bu, §26b'nin
+# kendi dersi: sonda dogrulugu seed-basi cok yuksek varyansli (K=0'da %8.5-69.5),
+# batch-ortalamali kayip ise dusuk varyansli. Egitim degismedi, yalnizca
+# egitim-SONRASI olcum. Not: bu degisiklikten onceki kosularin (§26/§27/§28)
+# bastigi tek-ornek sayisiyla dogrudan kiyaslanamaz.
+VAL_N = int(os.environ.get("CC_VAL_N", "64"))   # kac farkli cross-chunk ornegi
+VAL_K = int(os.environ.get("CC_VAL_K", "2"))    # kac dolgu chunk (birincil: 2)
+VAL_BS = 8
+# Olcum kendi RNG akisini kullanir ve bitince global durumu geri koyar; boylece
+# VAL_N'i degistirmek asagidaki omur sondasinin rastgeleligini KAYDIRMAZ.
+# (Eski surumde blok bir carry_example tuketiyordu; o yuzden sonda akisi bu
+# degisiklikten once/sonra birebir ayni degil.)
+_val_rng = random.Random(12345 + SEED)          # olcum, egitim RNG'sinden AYRI
+_saved_state = random.getstate()
+random.setstate(_val_rng.getstate())
+_losses = []
 with torch.no_grad():
-    a, al, fills, b, bl = carry_example(2)
-    xa = torch.tensor([a]*8, device=DEV); ya = torch.tensor([al]*8, device=DEV)
-    o = model(xa, labels=ya, use_cache=True); past = o.past_key_values
-    for j in range(2):
-        xf = torch.tensor([fills[j]]*8, device=DEV)
-        past = model(xf, past_key_values=past, use_cache=True).past_key_values
-    xb = torch.tensor([b]*8, device=DEV); yb = torch.tensor([bl]*8, device=DEV)
-    _l = model(xb, labels=yb, past_key_values=past, use_cache=True).loss.item()
-print(f"[{TAG}] egitim-sonu cross-chunk dogrulama loss: {_l:.3f} (sans ~3.40)")
+    for _b0 in range(0, VAL_N, VAL_BS):
+        n = min(VAL_BS, VAL_N - _b0)
+        ex = [carry_example(VAL_K) for _ in range(n)]     # n FARKLI ornek
+        xa = torch.tensor([e[0] for e in ex], device=DEV)
+        ya = torch.tensor([e[1] for e in ex], device=DEV)
+        past = model(xa, labels=ya, use_cache=True).past_key_values
+        for j in range(VAL_K):
+            xf = torch.tensor([e[2][j] for e in ex], device=DEV)
+            past = model(xf, past_key_values=past, use_cache=True).past_key_values
+        xb = torch.tensor([e[3] for e in ex], device=DEV)
+        yb = torch.tensor([e[4] for e in ex], device=DEV)
+        _losses.append(model(xb, labels=yb, past_key_values=past,
+                             use_cache=True).loss.item())
+random.setstate(_saved_state)
+VAL_LOSS = float(np.mean(_losses))
+VAL_SEM = float(np.std(_losses, ddof=1) / np.sqrt(len(_losses))) if len(_losses) > 1 else float("nan")
+print(f"[{TAG}] egitim-sonu cross-chunk dogrulama loss (K={VAL_K}, n={VAL_N} farkli ornek): "
+      f"{VAL_LOSS:.4f} +/- {VAL_SEM:.4f} (batch-SEM) (sans ~3.40)")
+with open(f"{CKDIR}/{TAG}_valloss.csv", "w", newline="") as f:
+    w = csv.DictWriter(f, fieldnames=["mode", "seed", "dpfp_nu", "write",
+                                      "val_k", "val_n", "val_loss", "val_sem"])
+    w.writeheader()
+    w.writerow(dict(mode=MODE, seed=SEED, dpfp_nu=DPFP_NU, write=WRITE,
+                    val_k=VAL_K, val_n=VAL_N, val_loss=round(VAL_LOSS, 4),
+                    val_sem=round(VAL_SEM, 4)))
+print(f"[{TAG}] yazildi: {CKDIR}/{TAG}_valloss.csv")
 
 # ---------------- EVAL: §17 ile BIREBIR AYNI omur sondasi ----------------
 def traffic_tokens(n, forbid_key):
