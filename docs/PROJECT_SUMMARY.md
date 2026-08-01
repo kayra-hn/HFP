@@ -67,15 +67,19 @@ an erratum rather than quietly edited.
 ## Honest status
 
 The graft is validated as an **efficient-attention technique**, not as a long-term
-memory store. The open question — whether the O(1) state can hold addressable
-information across chunk boundaries given adequate architectural freedom — is under
-test: our small-scale model with *trainable* projections reaches 33–53% at one
-boundary where the graft with *frozen, borrowed* projections reaches 0%, that experiment
-has now been run: own trainable q/k/v (~19M params) improved *quality* markedly but
-produced **0%** cross-boundary retrieval, like every earlier arm. Four
-pre-registered interventions have moved it not at all, so the graft route to a
-memory organ is closed; the thesis would require a memory-first architecture, which
-is a separate programme.
+memory store — and we tested that distinction hard rather than assuming it.
+
+Four pre-registered interventions targeted cross-boundary storage: restoring
+gradient to the write path, un-detaching the recurrent state at chunk boundaries,
+masking the recall loss to the answer tokens only, and finally giving the memory
+path its own trainable `q/k/v` (150k → 19M parameters). The last of these improved
+*language quality* markedly (1.111× → 1.043×) and produced **0%** cross-boundary
+retrieval — as did all the others. Storage is therefore neither capacity-limited nor
+representation-limited in any way reachable from this direction.
+
+The graft route to a memory organ is closed. Pursuing the thesis further would
+require a **memory-first architecture** trained with retrieval as a primary
+objective, not a graft onto a frozen model — a separate programme, not a next run.
 
 ## Method
 
