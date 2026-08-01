@@ -1965,8 +1965,14 @@ was measured at ~25 h on CPU; the baseline arm runs in the same sweep, so
 comparable to §26b.
 
 **Primary endpoint:** **end-of-training cross-chunk validation loss at K=2**, in
-nats, **paired by seed** (treatment − baseline). Chance ≈ 3.40 nat; lower is
-better. This is the low-variance endpoint §26b identified: a batch-averaged loss
+nats, **paired by seed** (treatment − baseline); lower is better. Two reference
+points, which are *not* the same number and were conflated in an earlier draft of
+this section: an untrained model sits at **ln(164) ≈ 5.10** (uniform over the
+vocabulary), while **ln(30) ≈ 3.40** is the loss of a model that has already
+learned the answer is one of the 30 value tokens but not *which* one. §26b's
+trained runs reached 1.75–2.15, i.e. well below 3.40. The verdict is computed on
+paired differences, so neither reference enters the criterion; they matter only
+for reading the absolute numbers. This is the low-variance endpoint §26b identified: a batch-averaged loss
 rather than a 30–50-trial accuracy. The measurement was fixed for this run — the
 previous implementation replicated a *single* example 8× (effective n=1) and wrote
 the number nowhere; it now averages **64 distinct carry examples** and is written
