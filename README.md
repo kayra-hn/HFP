@@ -122,8 +122,14 @@ Headline findings (small scale, synthetic recall; patterns are seed-robust):
   retrieval measured so far is carried by the KV cache of the un-grafted attention
   layers, **not** by the recurrent state. With the cache reset per chunk, retrieval
   from the state alone is 0%. The graft is validated as an *efficient-attention*
-  technique (1.11× PPL, ~8% VRAM and ~21% decode saving at 128k), **not** as a
-  long-term memory store. Work on the latter is in progress (§31-§33).
+  technique, **not** as a long-term memory store. Four pre-registered interventions
+  (§31, §33, §34) failed to produce any cross-boundary retrieval; the graft route to
+  a memory organ is closed (RESULTS §34a).
+- **Two Pareto points for the graft** (Qwen2.5-1.5B, 6 layers, free-tier T4):
+  **149,910 params (0.01%) → 1.111× PPL** (3 seeds), or **~19M params (1.3%) with
+  trainable memory projections → 1.043× PPL** — the latter meets the project's
+  original `≤1.05×` criterion for the first time. Measured at 128k: ~8% peak VRAM
+  and ~21% decode-latency saving; grafted-layer state 9.5 MB, constant in context.
 - **Language Modeling**: HFP showed a favorable small-scale TinyShakespeare ranking against a GPT-2-style baseline under the same historical skip-one objective (PPL labels are under revision; see RESULTS §14). This is evidence for LM viability, not a final next-token/O(1) headline claim.
 - **GLA family comparison — under revision (honest note)**: a metric artifact
   (double-shifted labels; RESULTS §14) made the published HFP-vs-GLA numbers

@@ -1750,6 +1750,59 @@ the 1.5B base)** — Qwen's GQA (2 KV heads) keeps `k/v` cheap. Base remains fro
 becomes "~1% of parameters" rather than "0.01%" — still small, but the frugality
 claim must be restated accordingly.
 
+**§34a — split result: memory NEGATIVE, quality a significant POSITIVE.**
+
+*Primary (pre-registered) question — cross-boundary storage: **failed again.***
+
+| gap | ~tokens | C: O(1) state | A: upper bound |
+|-----|---------|---------------|----------------|
+| 0 | 128 | **0%** | **100%** |
+| 1 | 256 | **0%** | — |
+| 2 | 384 | **0%** | — |
+
+Giving the memory path its own trainable `q/k/v` (19M params vs 150k) moved
+cross-boundary retrieval **not at all** — still byte-identical filler continuations.
+The frozen-projection hypothesis is **refuted** as an explanation for the storage
+failure.
+
+*Secondary outcome — language quality: the best result the project has produced.*
+
+| arm | trainable params | PPL | ratio | ≤1.05× criterion |
+|-----|------------------|-----|-------|------------------|
+| §22 reference | 149,910 (0.01%) | 8.84 | 1.111× | failed |
+| **§34 own-proj** | **~19M (1.3%)** | **8.30** | **1.043×** | **MET — first time** |
+
+Needle (cache present) 4/4 at all four lengths. The K3 criterion `PPL ≤ 1.05×`,
+set at the start of the graft line and never met in ~10 runs, is now met. So the
+frozen projections *were* a real bottleneck — for **local attention approximation
+quality**, not for storage. Two clean Pareto points now exist: 0.01% params at
+1.11×, or 1.3% params at 1.04×.
+
+**What this tells us about the storage failure.** More representational freedom
+(127× more trainable parameters, own projections, all three training blockers
+removed) buys substantial quality and **exactly zero** cross-boundary retrieval.
+Storage is therefore not capacity-starved and not representation-starved in any way
+we can reach from this direction — it is a *different kind* of failure. Per the
+pre-registration, the **graft route to a memory organ is closed.**
+
+**Honest limitation across all memory arms (§30–§34), recorded rather than
+excused.** Every run used the same recall budget: `RECALL_MIX=0.25` over 600 S2
+steps ≈ **150 recall steps** (~600 examples), with gaps {0,1}. That is a small
+amount of supervision for acquiring a genuinely new capability, and it was constant
+across arms — so it cannot explain *differences* between arms, but it could in
+principle explain the uniform zero. We are not running another arm to test it: four
+pre-registered interventions have now produced no movement whatsoever, and
+continuing would be the patch-chasing the §33a decision point explicitly ruled out.
+It is stated here so that anyone continuing this line knows the first thing to vary.
+
+**Net position after §34.** The project's validated contribution is an
+**efficient-attention graft**, now with a genuinely competitive quality point
+(1.043× at 1.3% trainable params, free-tier T4), a mapped density wall with a
+compounding diagnosis, a regime-dependent retention-law result, and a methodological
+warning about KV-cache-carried retrieval in hybrids. The memory-organ thesis is
+**not supported by any evidence we have produced**, and pursuing it further requires
+a memory-first architecture rather than a graft — a separate programme.
+
 ## 32. Delta write rule for cross-boundary storage (pre-registered)
 
 Motivated by the project's own oldest finding — **"the memory is

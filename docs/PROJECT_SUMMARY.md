@@ -25,10 +25,12 @@ alongside positives.
 
 ## Main results
 
-**1. An extremely small graft preserves language quality.**
+**1. A very small graft preserves language quality — two Pareto points.**
 6 of 28 attention layers converted to O(1) memory with **149,910 trainable
 parameters (~0.01% of the base)** holds perplexity at **1.11× baseline
-(7.96 → 8.84), replicated across 3 seeds**. Measured savings at 128k context:
+(7.96 → 8.84), replicated across 3 seeds**; giving the memory path its own
+trainable projections (**~19M, 1.3%**) reaches **1.043× (7.96 → 8.30)**, meeting the
+project's pre-set `≤1.05×` bar for the first time. Measured savings at 128k context:
 **~8% peak VRAM and ~21% decode latency**; the grafted layers' state is
 **9.5 MB, constant in context length** versus ~3.8 GB of KV cache.
 
@@ -68,9 +70,12 @@ The graft is validated as an **efficient-attention technique**, not as a long-te
 memory store. The open question — whether the O(1) state can hold addressable
 information across chunk boundaries given adequate architectural freedom — is under
 test: our small-scale model with *trainable* projections reaches 33–53% at one
-boundary where the graft with *frozen, borrowed* projections reaches 0%, so the next
-pre-registered experiment gives the memory path its own trainable q/k/v
-(~19M params, ~1.3% of the base).
+boundary where the graft with *frozen, borrowed* projections reaches 0%, that experiment
+has now been run: own trainable q/k/v (~19M params) improved *quality* markedly but
+produced **0%** cross-boundary retrieval, like every earlier arm. Four
+pre-registered interventions have moved it not at all, so the graft route to a
+memory organ is closed; the thesis would require a memory-first architecture, which
+is a separate programme.
 
 ## Method
 
