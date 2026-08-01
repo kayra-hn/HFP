@@ -49,7 +49,10 @@ eğitim kaybı.
 - **ETKİ YOK:** her kol K=2'de <%10 → girişim de değil; sınır daha temel
   (okuma yolu / adresleme). O zaman mimari soru yeniden formüle edilir.
 
-**Maliyet:** CPU'da koşar, GPU gerekmez. Kol başına ~10-20 dk.
+**Maliyet (DÜZELTİLDİ — ilk tahmin yanlıştı):** CPU'da taban kol 1200 adımda
+~95 dk sürdü, `nu=8` daha da yavaş; 16 kol ~25 saat = Kaggle'ın 12 saatine sığmıyor.
+v2'de kapsam kısıldı (CTX 128, 600 adım, BS 4, 2 seed, nu=4) ve **GPU (T4)**
+kullanılıyor → toplam ~1-2 saat.
 
 ---
 
