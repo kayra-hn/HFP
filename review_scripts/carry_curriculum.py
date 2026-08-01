@@ -77,22 +77,31 @@ DIST_EVERY = int(os.environ.get("CC_DIST_EVERY", "64"))
 # [GOREV G] CC_BPTT=1: chunk siniri DETACH edilmez -> B'nin loss'u decay/yazma
 # yoluna sinir otesinden gradyan tasir (§20a hipotezinin dogrudan mudahalesi).
 BPTT = os.environ.get("CC_BPTT", "0") == "1"
+# [§35] Kapasite x yazim kurali taramasi.
+#   DPFP_NU: state kapasitesi. key_dim = 2*hidden*nu -> nu=2:256 (mevcut), nu=8:1024 (4x).
+#     O(1)'i BOZMAZ: sabit buyur, baglamla degil. bulk_dim'in bellege ETKISI YOK (o FFN'de).
+#   WRITE:   'additive' (biriktir) | 'delta' (eskiyi sil, uzerine yaz) | 'hybrid'
+DPFP_NU = int(os.environ.get("CC_DPFP_NU", "2"))
+WRITE = os.environ.get("CC_WRITE", "additive")
 
 KLO, KHI, VLO, VHI, FHI = 100, 130, 130, 160, 100      # sans = 1/30
 WIN, ANS = 8, 0
-TAG = f"carryv1{'t' if BPTT else ''}_{MODE}_s{SEED}"   # t = tbptt kolu
+# [§35] konfig etiketi -> farkli kollar ayri checkpoint soyu (cakisma yok)
+CFG = "" if (DPFP_NU == 2 and WRITE == "additive") else f"_nu{DPFP_NU}{WRITE[0]}"
+TAG = f"carryv1{'t' if BPTT else ''}{CFG}_{MODE}_s{SEED}"   # t = tbptt kolu
 CKPT = f"{CKDIR}/{TAG}.pt"
 
 random.seed(SEED); np.random.seed(SEED); torch.manual_seed(SEED)
 cfg = HFPConfig(vocab_size=VHI + 4, hidden_size=64, num_hidden_layers=2,
                 num_attention_heads=2, intermediate_size=256, bulk_dim=32,
                 short_len=8, max_position_embeddings=CTX + 8, local_window=WIN,
-                decay_mode=MODE, rec_block=32, write_rule="additive",
-                key_feature_map="dpfp", pe_period=CTX,
+                decay_mode=MODE, rec_block=32, write_rule=WRITE,
+                key_feature_map="dpfp", dpfp_nu=DPFP_NU, pe_period=CTX,
                 bptt_across_chunks=BPTT)   # [GOREV G] icsel detach kapatilir
 model = HFPForCausalLM(cfg)
 DEV = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(DEV)
+print(f"[{TAG}] state: dpfp_nu={DPFP_NU} key_dim={2*64*DPFP_NU} write={WRITE}")
 print(f"[{TAG}] cihaz={DEV} carry_max={CARRY_MAX} (~{CARRY_MAX*CTX} token tasima) ctx={CTX}")
 
 # ---------------- EGITIM: streaming + chunklar arasi tasima ----------------

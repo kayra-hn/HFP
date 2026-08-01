@@ -31,7 +31,8 @@ girişimi biriktirip *kötüleştirdi*). Dolgu chunk'ları her 64 tokende bir
 distraktör kv yazıyor; iki chunk sonra hedef gömülüyor.
 
 O halde zincirlemeyi açacak iki kaldıraç:
-- **Daha büyük state** (`bulk_dim`, `dpfp_nu`) → girişim seyrelir. **O(1)'i bozmaz**
+- **Daha büyük state** (`dpfp_nu`; `bulk_dim` belleği ETKİLEMİYOR, o FFN'de) →
+  girişim seyrelir. **O(1)'i bozmaz**
   — sabit büyür, bağlamla büyümez.
 - **Delta yazım** (`write_rule='delta'`) → eski değeri siler, üst üste biriktirmez.
   Kodda hazır; anahtar-güncelleme görevinde 2× kazandırmıştı.

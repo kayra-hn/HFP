@@ -67,18 +67,22 @@ TRIALS = int(os.environ.get("MP_TRIALS", "30"))
 CTX = int(os.environ.get("MP_CTX", "256"))
 P = int(os.environ.get("MP_P", "6"))
 DIST_EVERY = int(os.environ.get("MP_DIST_EVERY", "64"))
+# [§35] carry ile AYNI konfig verilmeli, yoksa checkpoint uymaz
+DPFP_NU = int(os.environ.get("MP_DPFP_NU", "2"))
+WRITE = os.environ.get("MP_WRITE", "additive")
 
 KLO, KHI, VLO, VHI, FHI = 100, 130, 130, 160, 100     # sans = 1/30
 WIN, ANS = 8, 0
-TAG = f"matchedv1_{MODE}_s{SEED}"
-SRC = f"{CKDIR}/carryv1_{MODE}_s{SEED}.pt"            # Gorev E checkpointi
+CFG = "" if (DPFP_NU == 2 and WRITE == "additive") else f"_nu{DPFP_NU}{WRITE[0]}"
+TAG = f"matchedv1{CFG}_{MODE}_s{SEED}"
+SRC = f"{CKDIR}/carryv1{CFG}_{MODE}_s{SEED}.pt"       # Gorev E checkpointi (ayni konfig)
 
 random.seed(SEED); np.random.seed(SEED); torch.manual_seed(SEED)
 cfg = HFPConfig(vocab_size=VHI + 4, hidden_size=64, num_hidden_layers=2,
                 num_attention_heads=2, intermediate_size=256, bulk_dim=32,
                 short_len=8, max_position_embeddings=CTX + 8, local_window=WIN,
-                decay_mode=MODE, rec_block=32, write_rule="additive",
-                key_feature_map="dpfp", pe_period=CTX)
+                decay_mode=MODE, rec_block=32, write_rule=WRITE,
+                key_feature_map="dpfp", dpfp_nu=DPFP_NU, pe_period=CTX)
 model = HFPForCausalLM(cfg)
 DEV = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(DEV)
