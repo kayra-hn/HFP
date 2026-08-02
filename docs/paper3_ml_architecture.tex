@@ -18,6 +18,42 @@
 \begin{document}
 \maketitle
 
+% =====================================================================
+% !! SUPERSEDED DRAFT -- DO NOT CIRCULATE (added 2026-08-02) !!
+%
+% This draft predates two findings recorded in RESULTS.md and is
+% inconsistent with the current experimental record. It must not be
+% shown to anyone in this state.
+%
+% 1. KV-CACHE CONFOUND (RESULTS erratum, sections 30a-30c). In this
+%    architecture the long-range retrieval reported here is carried by
+%    the KV cache of the un-grafted attention layers, NOT by the O(1)
+%    recurrent state. With the cache reset per chunk, retrieval from the
+%    state alone is 0% at every distance tested, including across a
+%    single chunk boundary. This draft contains no mention of it.
+%
+% 2. CUBIC REVERSES AT LM SCALE (RESULTS section 36, 2026-08-02). With
+%    the cache confound removed, carrying the cubic state across a chunk
+%    boundary costs 0.28 nat/token versus discarding it; paired
+%    difference against exp is -0.3167 nat/token, Wilcoxon p = 2.7e-09.
+%    The title thesis of this paper is the mechanism that failed.
+%
+% Consequently the following are UNSUPPORTED or CONTRADICTED as written:
+%   - title: "via Cubic-Plateau Retention"
+%   - abstract: "robust long-horizon retention without catastrophic
+%     interference"
+%   - section 4 note: "later verified to outperform exp in sparse
+%     long-horizon retention"
+%   - section 7: "validates cubic_flux + additive + dpfp as the target
+%     recipe for scaling"
+%   - discussion: "appears beneficial for sparse long-horizon recall"
+%
+% Repositioning is tracked as BEKLEYEN #13. The honest core that
+% survives: the graft recipe and its two Pareto points, the density wall
+% and its compounding diagnosis, and the cache-confound protocol itself.
+% Claim-by-claim audit: docs/internal_tr/IDDIA_DENETIMI_2026-08.md
+% =====================================================================
+
 \begin{abstract}
 \noindent
 We introduce the Hyper-Flux Projection (HFP) Machine Learning Architecture, an $O(1)$-memory causal language model. The \emph{Cubic-Plateau Retention} mechanism---an exact discretization of the ODE $d\theta/d\tau = -\eta\,\theta^{3}$---is presented as a standalone machine learning contribution. Its motivation is disclosed transparently: the cubic form was originally inspired by a now-withdrawn physical mechanism (the ``stiff transient'' of HFP Papers I--II v1), but is employed here purely as an empirical design choice. We demonstrate that this magnitude-dependent decay, when combined with DPFP capacity expansion and Delta-rule writes, enables robust long-horizon retention without catastrophic interference. We report multi-seed synthetic recall results and initial language-model ablations (WikiText-2, $\le$16M parameters) validating the architecture's capability to generalize from short-context training to long-context inference natively.

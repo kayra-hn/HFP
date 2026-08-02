@@ -42,14 +42,31 @@ reconstruction cost, LR/warmup stabilisation, and a student-forward
 excellent (MSE ≈ 0.089) while end-to-end quality degrades — localising the limit to
 **error compounding through stacked lossy layers**, not per-layer capacity.
 
-**3. Retention law matters only in sparse-write regimes.**
+**3. Retention law: a small-scale win that reverses at LM scale.**
 A content-adaptive "cubic" decay (λ = 1/√(1+2η·z²), forgetting scaled by channel
-occupancy) versus a fair multi-scale learned-λ exponential control:
-*no measurable difference* in the dense/saturated LLM-graft regime, but a
-pre-registered, paired, 16-seed win in a sparse-write carry task
-(**+0.48 nat, 13/16 seeds, p = 0.012**). Tuning its one free parameter improves it
-in neither direction, and large values are numerically unstable — so the effect is
-real, modest, and regime-specific.
+occupancy) versus a fair multi-scale learned-λ exponential control.
+
+*Small scale, synthetic sparse writes:* a pre-registered, paired, 16-seed win —
+**+0.48 nat, 13/16 seeds, p = 0.012**, replicated at **+0.41 nat, 14/16,
+p = 0.0005**. Decomposing that metric, however, places **+0.43 nat in-chunk**
+(p = 0.0008) against only **+0.28 nat cross-chunk** (paired t p = 0.11): the gain
+is mostly within-chunk retention, not carrying across a boundary.
+
+*LM scale, with the cache confound removed:* the same two controlled graft twins
+were re-evaluated with the KV cache reset at every chunk boundary, so the O(1)
+state is the only cross-boundary channel. Carrying the cubic state then makes
+next-token prediction **0.28 nat/token worse** than discarding it, while the
+exponential arm gains a marginal +0.035 — a paired difference of
+**−0.3167 nat/token, Wilcoxon p = 2.7e−09**. The earlier null in this regime
+(§15h) was measured with the cache present and was therefore largely blind to the
+state.
+
+The mechanism is the same in both directions: a decay that forgets less protects
+an unsaturated channel, and for exactly that reason retains stale content longer
+once the context moves on. Tuning the one free parameter improves it in neither
+direction and large values are numerically unstable. **Verdict: the effect is real
+at small scale, narrower in attribution than first reported, and reversed at LM
+scale. `exp` is the shipped default; the cubic LM-scale line is closed.**
 
 **4. A methodological warning for the field (self-inflicted, then corrected).**
 Apparent long-range retrieval in attention/O(1) **hybrids can be carried entirely by

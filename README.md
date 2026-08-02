@@ -61,21 +61,39 @@ A fixed-size recurrent memory must forget. *How* it forgets is the design choice
 Set the mode with `decay_mode="exp"` / `"cubic_flux"` (config) or
 `--decay_mode` (CLI). Everything else is held identical, so the two modes are a
 clean controlled comparison of the retention law alone. That comparison has now
-been run in two different regimes, and the honest answer is **regime-dependent**:
+been run at two scales, and **the answer changed when the measurement protocol
+was fixed**:
 
-- **Dense / saturated writes (LLM-graft, WikiText):** *no measurable difference*
-  between the laws (RESULTS §15h). Here `exp` is the pragmatic default — same
-  quality, simpler, faster (no sequential scan).
-- **Sparse writes / long-lived memory (cross-chunk carry):** `cubic_flux_chunked`
-  is **measurably better** than a fair multi-scale learned-λ exponential control —
-  pre-registered, paired, n = 16 seeds: **+0.48 nat, 13/16 seeds, p = 0.012**
-  (RESULTS §28a).
+- **Small-scale synthetic, sparse writes:** `cubic_flux_chunked` beats a fair
+  multi-scale learned-λ exponential control — pre-registered, paired, n = 16
+  seeds: **+0.48 nat, 13/16, p = 0.012** (§28a), replicated at **+0.41 nat,
+  14/16, p = 0.0005** (§29b). **But the attribution is narrower than it looks:**
+  decomposing that metric gives **+0.43 nat in-chunk** (p = 0.0008) and only
+  **+0.28 nat cross-chunk** (paired t p = 0.11, not significant). Most of the
+  gain is within-chunk retention, not carrying across a boundary (§29b).
+- **Dense / saturated writes (LLM-graft, WikiText), cache present:** *no
+  measurable difference* between the laws (§15h). Note this was measured **with
+  the KV cache on**, and the erratum showed that protocol is largely blind to the
+  recurrent state — so it is weak evidence either way.
+- **LM scale, cache confound removed (§36):** with the KV cache reset at every
+  chunk boundary so the O(1) state is the only cross-boundary channel, carrying
+  cubic's state makes next-token prediction **0.28 nat/token worse** than
+  discarding it, while `exp` gains a marginal +0.035. Paired difference
+  **−0.3167 nat/token, Wilcoxon p = 2.7e−09**. Cubic is not merely no better
+  here — it is measurably worse.
 
-The mechanism explains both: cubic's decay adapts to channel occupancy
-(λ = 1/√(1+2η z²)), so it can protect an unsaturated channel — an advantage that
-exists only when channels are *not* continuously saturated. Practical rule:
-**`exp` for dense-write LM work, `cubic_flux_chunked` for sparse-write /
-long-lived-memory work.**
+The mechanism is consistent across both directions: cubic's decay adapts to
+channel occupancy (λ = 1/√(1+2η z²)), so it protects an unsaturated channel — and
+for the same reason it **retains stale content longer** once the context moves on.
+§27a saw this directly: lengthening cubic's plateau made retention *worse*,
+because a channel that forgets less accumulates more interference. §36 is that
+effect at 1.5B scale.
+
+**Practical rule: `exp` is the default everywhere.** `cubic_flux` has a
+demonstrated advantage on a small-scale synthetic sparse-write task and a
+demonstrated disadvantage at LM scale under a cache-reset protocol. It is
+**shelved** (BEKLEYEN #21) for engineering reasons independent of this, and §36
+closed its LM-scale case.
 
 ## Architecture
 
@@ -114,10 +132,23 @@ Headline findings (small scale, synthetic recall; patterns are seed-robust):
 - **DPFP capacity axis** (`key_feature_map="dpfp"`) is the first mechanism with a
   clear, 3-seed advantage: ~2-6x baseline accuracy at long gaps under high
   interference, and it stabilizes training across seeds.
-- **Official recipe (locked)**: `cubic_flux_chunked` decay + `additive` writes +
-  `dpfp` features + `ffn_type="standard"` (WikiText-2 ablation, RESULTS §10; write
-  rule locked by the pre-registered K2 experiment, RESULTS §13).
-- **`cubic_flux` long-horizon win**: In sparse, long-gap regimes (gap ≥ 256), `cubic_flux_chunked` paired with DPFP outperforms the exponential baseline significantly (3x recall advantage) — confirmed at n=16 seeds, p=0.012 (RESULTS §28a). Note this is a *relative* result on a small-scale synthetic task; both arms are weak in absolute terms.
+- **Small-scale ablation recipe**: `additive` writes + `dpfp` features +
+  `ffn_type="standard"` (WikiText-2 ablation, RESULTS §10; write rule locked by
+  the pre-registered K2 experiment, RESULTS §13). §10 selected `cubic_flux_chunked`
+  as the decay for *that* ablation; **the shipped default is `exp`** — see §15h
+  (no advantage in the graft), §28b (cubic shelved on engineering grounds) and
+  §36 (measurable disadvantage at LM scale).
+- **`cubic_flux` small-scale results — two separate experiments, do not merge**:
+  (a) §6, a targeted long-horizon task (ctx 1280, gap ≥ 256): 63.9% vs 20.7%
+  recall, i.e. a ~3× *relative* advantage on a small synthetic task where both
+  arms are weak in absolute terms; (b) §28a/§29b, a pre-registered paired
+  comparison whose endpoint is **loss, not recall**: +0.48 nat, 13/16, p = 0.012,
+  replicated at +0.41 nat, 14/16, p = 0.0005. §29b's decomposition shows most of
+  (b) is in-chunk retention rather than cross-boundary carry.
+- **⚠ `cubic_flux` at LM scale is a negative result (RESULTS §36):** with the KV
+  cache reset per chunk, carrying the cubic state across a boundary costs
+  **0.28 nat/token** versus discarding it (paired difference vs `exp`:
+  −0.3167 nat/token, Wilcoxon p = 2.7e−09). The cubic LM-scale line is closed.
 - **⚠ What the O(1) state does NOT do (RESULTS §30):** in the LLM graft, long-range
   retrieval measured so far is carried by the KV cache of the un-grafted attention
   layers, **not** by the recurrent state. With the cache reset per chunk, retrieval
@@ -127,8 +158,10 @@ Headline findings (small scale, synthetic recall; patterns are seed-robust):
   a memory organ is closed (RESULTS §34a).
 - **Two Pareto points for the graft** (Qwen2.5-1.5B, 6 layers, free-tier T4):
   **149,910 params (0.01%) → 1.111× PPL** (3 seeds), or **~19M params (1.3%) with
-  trainable memory projections → 1.043× PPL** — the latter meets the project's
-  original `≤1.05×` criterion for the first time. Measured at 128k: ~8% peak VRAM
+  trainable memory projections → 1.043× PPL (single seed)** — the latter meets the
+  project's original `≤1.05×` criterion for the first time, but has **not** been
+  replicated across seeds; that replication is the one outstanding debt before any
+  headline use of the 1.043× figure. Measured at 128k: ~8% peak VRAM
   and ~21% decode-latency saving; grafted-layer state 9.5 MB, constant in context.
 - **Language Modeling**: HFP showed a favorable small-scale TinyShakespeare ranking against a GPT-2-style baseline under the same historical skip-one objective (PPL labels are under revision; see RESULTS §14). This is evidence for LM viability, not a final next-token/O(1) headline claim.
 - **GLA family comparison — under revision (honest note)**: a metric artifact
