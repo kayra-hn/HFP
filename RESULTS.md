@@ -2203,6 +2203,88 @@ be run later; the stopping rule and the 2-run budget attach to it whenever it
 resumes. §35a's invalid-run findings (vehicle below §26b capability, confounded
 endpoint) remain valid and must be honoured by any future attempt.
 
+## 36. Retention law at LM scale, with the cache confound removed (pre-registered)
+
+*Written before the run. Authoritative pre-registration; the notebook markdown is a
+convenience copy.*
+
+**The question.** BEKLEYEN #21's un-shelving condition #3 is: does cubic's
+sparse-regime advantage replicate at LM scale? §29b closed conditions #1 and #2
+descriptively; #3 is the binding constraint.
+
+**Why §15h does not already answer it.** §15h ran the controlled cubic-vs-exp graft
+twins and found a clean null (PPL 12.87 exp vs 13.04 cubic; grid 42/45 vs 38/45).
+But §15h evaluated **with the KV cache present**, and the erratum (§30) established
+that in this hybrid the long-range signal is carried by the cache of the un-grafted
+attention layers, not by the O(1) state. A comparison blind to the state is
+necessarily blind to the retention law, which acts only on the state. **§15h's null
+is largely a property of its protocol, not evidence about cubic.** This is the same
+confound this project warned the field about, applied to our own retention result.
+
+**Models.** The §15h controlled twins, already trained and archived — no training
+required:
+- `checkpoints/graft_run5/hfp_graft_final.pt` — `cubic_flux_chunked`, out_gain ≈ 0.237
+- `checkpoints/graft_run6_exp/hfp_graft_exp_final.pt` — `exp`, out_gain ≈ 0.239
+
+Identical protocol, single variable `decay_mode`. **Caveat recorded in advance:** these
+are the §15f/§15h-era dense graft (odd-indexed layers, ~325k params, PPL ≈ 1.64×),
+not the current 6-layer/149,910-param reference. Any finding belongs to that
+configuration. The grafted layer set is read from the checkpoint keys and asserted
+identical across the twins rather than assumed.
+
+**Protocol — state isolation by within-model differencing.** Held-out text is streamed
+in chunks of length L. The HF `DynamicCache` is **reset at every chunk boundary**, so
+the un-grafted attention layers cannot carry anything across. Four conditions:
+
+| | grafted state across boundaries |
+|---|---|
+| **A** cubic | carried (`enable_streaming(True)`, no `reset_streaming`) |
+| **A₀** cubic | reset each chunk (`reset_streaming`) — control |
+| **B** exp | carried |
+| **B₀** exp | reset each chunk — control |
+
+**"State contribution"** is defined as the within-model difference
+`Δ = CE(state reset) − CE(state carried)`, i.e. how much carrying the recurrent state
+across a boundary improves next-token prediction. Differencing within a model removes
+the confound that the two twins have different baseline quality.
+
+**Endpoint.** Mean per-token cross-entropy over the **first 32 tokens of each chunk**
+(chunk index ≥ 1), where local context is nearly empty and cross-boundary information
+matters most. Paired by chunk index across the two arms.
+
+**Power gate — checked before any comparison.** If neither arm shows a state
+contribution (Δ_cubic and Δ_exp both ≈ 0), the recurrent state carries nothing
+measurable and cubic-vs-exp is a **zero-power** comparison. In that case the result is
+reported as **inconclusive, not null**, per this project's power rule, and no claim is
+made about the retention law. §30 found exact retrieval at 0% for this architecture;
+this endpoint is continuous, so partial information can register where retrieval could
+not — but that is a hypothesis, not an assumption.
+
+**Pre-registered criteria** (conditional on the gate; primary endpoint; paired by
+chunk; **test specified in advance as Wilcoxon signed-rank**, because §29b showed this
+project's per-seed/per-chunk distributions carry outliers that break the t-test):
+- **CUBIC ADVANTAGE AT LM SCALE:** Δ_cubic − Δ_exp ≥ **0.02 nat/token** with
+  Wilcoxon p < 0.05 → the retention law measurably matters once the cache confound is
+  removed; §15h's null is attributed to its protocol and condition #3 is met.
+- **REVERSED:** Δ_exp − Δ_cubic ≥ 0.02 nat/token with p < 0.05 → exp is better here
+  too; cubic's LM-scale case closes.
+- **TIE:** |Δ_cubic − Δ_exp| < 0.02 nat/token → the laws are equivalent at LM scale in
+  this configuration. Combined with §15h this would be a **second, protocol-corrected
+  null**, and condition #3 would be recorded as failed.
+
+The 0.02 nat/token threshold is set to be small relative to §28a's small-scale effect
+(+0.48 nat on a single supervised token) while remaining meaningful as a per-token LM
+loss difference; it is stated here so it cannot be adjusted afterwards.
+
+**Checkpoint-load verification is mandatory** before any number is reported: tensor
+name/shape match count, bit-exact value comparison, and an `out_gain` training-trace
+check (§30 cell 7 protocol). `strict=False` can silently load nothing.
+
+**Stopping rule.** This is a single run. If the gate fails, or the verdict is TIE, the
+cubic LM-scale line closes and no further small-scale work is justified for it. If
+CUBIC ADVANTAGE, exactly one follow-up is permitted: repeat on the **current** 6-layer
+reference recipe, which requires training fresh twins.
+
 ## Reproduction
 
 ```bash
