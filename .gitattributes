@@ -1,7 +1,19 @@
-# Notebook cikti/metadata gurultusunu git'ten uzak tut.
-# Sebep: bulut ortamlarinda notebook kosunca outputs/execution_count degisiyor ve
-# her `git pull` "local changes would be overwritten" ile duruyordu.
-# Kurulum (her klonda BIR KEZ, opsiyonel — filtre yoksa dosya zararsizdir):
-#   git config filter.nbstrip.clean "python3 -c \"import sys,json; nb=json.load(sys.stdin); [c.update(outputs=[],execution_count=None) for c in nb['cells'] if c['cell_type']=='code']; json.dump(nb,sys.stdout,ensure_ascii=False,indent=1)\""
-#   git config filter.nbstrip.smudge cat
-*.ipynb filter=nbstrip
+# HFP Git Attributes Configuration (Line Endings & Binary Handling)
+# Set default behavior to LF for text files to prevent EOL diff artifacts
+
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.tex text eol=lf
+*.sh text eol=lf
+
+# Binary files - preserve exact byte values
+*.pt binary
+*.safetensors binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.pyc binary

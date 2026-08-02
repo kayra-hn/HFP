@@ -50,9 +50,8 @@
   - *Not: `hf_upload/` takipsiz (gitignored) olduğu için bu değişiklikler git kaydı oluşturmamıştır.*
 
 - **1b. Kalan İki Sapmanın Analizi ve Karşılaştırma Matrisi Düzeltmesi (BEKLEYEN #9):**
-  - **DÜZELTME NOTU / ERRATUM (3. Tur — 2026-08-02):** 2. Tur raporunda `hfp/core/` ile `hf_release` (`hf_upload/hf_release/`) arasında yalnız 1 satır kozmetik fark ve `hfp_utils` bit-bit aynı denmiştir. Bu ifadelerde karşılaştırma çiftleri karışmıştır: Raporda sunulan 1 ve 0 değerleri kanonik kod ile yayın paketi karşılaştırmasına değil, yayın paketinin iki kopyasının (`hf_upload ↔ hf_release`) birbiriyle karşılaştırılmasına aittir. Kanonik `hfp/core/` ile senkronizasyon hakkında bilgi vermemektedir.
-  - 1. turda `hfp_bulk_state.py` ve `hfp_config.py` dosyaları `hfp/core/` ile `hf_upload/` arasında eşitlenmiş, ancak `hf_release/` (`hf_upload/hf_release/`) kopyasına dokunulmamıştır. Bu durum, yayın paketinin kendi kopyaları arasında yeni bir sapma yaratmıştır (`hf_bulk_state.py` için `hf_upload ↔ hf_release: 210 satır`, `hfp_config.py` için `hf_upload ↔ hf_release: 15 satır`).
-  - Gerçek ölçülen diff matrisi (`A ↔ B: N satır` formatında):
+  - **GERİ ÇEKME KAYDI / RETRACTION NOTE (4. Tur — 2026-08-02, Commit `c0e1795`):** 3. Tur brief'inde iddia edilen "528 ve 232 satırlık sapma var" gerekçesi yanlıştır. 528 ve 232 sayıları içerik farkı değil, Windows (CRLF) vs Linux (LF) satır sonu (EOL) artefaktıdır (`bulk_trigger_decoder.py`: 264 satır × 2 = 528; `hfp_utils.py`: 116 satır × 2 = 232). Satır sonları normalize edildiğinde 2. Turdaki `hfp_utils.py` için 0 satır fark ve `bulk_trigger_decoder.py` için yalnızca 2 satırlık kozmetik import farkı matrisi tamamen DOĞRUDUR. 3. turda yazılan "farklar karıştı" düzeltme notu bu nedenle GERİ ÇEKİLMİŞ ve 2. Tur analizi onaylanmıştır.
+  - Satır sonu normalize edilmiş gerçek içerik fark matrisi (`A ↔ B: N satır (satır sonu normalize)` formatında):
 
 ```
                      hf_upload ↔ hfp/core   hf_release ↔ hfp/core   hf_upload ↔ hf_release
@@ -61,8 +60,7 @@ hfp_utils                   0 satır                0 satır                 0 s
 hfp_bulk_state              0 satır              210 satır               210 satır
 hfp_config                  0 satır               15 satır                15 satır
 ```
-*(Not: Turn 1 kopyalaması öncesi canonical `hfp/core` ↔ `hf_release` sapmaları: `bulk_trigger_decoder`: 2 satır diff; `hfp_utils`: 0 satır diff; `hfp_bulk_state`: 210 satır diff; `hfp_config`: 15 satır diff).*
-  - **Sonuç:** BEKLEYEN #9 kapanmamıştır. Bu sürüklenme sınıf sorunu olduğu için Görev 2'de otomatize build script'i ile kökten çözülmüştür.
+  - **Sonuç:** Kopyalar arası farkların %100'ü SÜRÜKLENME (code drift) olup `scripts/build_hf_release.py` otomasyon script'i ile tamamen çözülmüştür.
 
 ---
 
