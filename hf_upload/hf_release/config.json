@@ -1,0 +1,40 @@
+{
+  "ENABLE_COHERENCE": false,
+  "architectures": [
+    "HFPForCausalLM"
+  ],
+  "auto_map": {
+    "AutoConfig": "configuration_hfp.HFPConfig",
+    "AutoModelForCausalLM": "modeling_hfp.HFPForCausalLM"
+  },
+  "aux_gate_entropy_weight": 0.0,
+  "aux_ortho_weight": 0.0,
+  "bos_token_id": 1,
+  "bptt_across_chunks": false,
+  "bulk_dim": 128,
+  "conv_kernel": 3,
+  "decay_mode": "exp",
+  "dpfp_nu": 2,
+  "dropout_p": 0.1,
+  "dtype": "float32",
+  "eos_token_id": 2,
+  "ffn_type": "entangled",
+  "hidden_size": 768,
+  "intermediate_size": 3072,
+  "key_feature_map": "elu",
+  "local_window": 64,
+  "max_position_embeddings": 4096,
+  "max_short_len": null,
+  "model_type": "hfp",
+  "num_attention_heads": 12,
+  "num_hidden_layers": 12,
+  "pe_scale": 0.3,
+  "rec_block": 64,
+  "short_len": 8,
+  "tie_word_embeddings": true,
+  "transformers_version": "5.13.0",
+  "tunnel_decay": 0.8,
+  "tunnel_depth": 3,
+  "vocab_size": 50257,
+  "write_rule": "additive"
+}

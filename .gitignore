@@ -55,7 +55,21 @@ osf_companion_v22.tex          # transient build copy (see osf_companion.tex)
 # --- reroot temizligi: yayinlanmaz ---
 _archive_old/
 _legacy_reference/
-hf_upload/
+# hf_upload/: URETILEN kopyalar disarida, ELLE YAZILMIS varliklar takipli.
+# Gerekce: GRAFT_MODEL_CARD.md, LISANS_KARAR_REHBERI.md Kapi 2'nin ismen
+# isaret ettigi lisans-uyum belgesi; takipsiz kalirsa yedegi yok.
+# Uretilen .py kopyalari scripts/build_hf_release.py ile yeniden uretilebilir.
+hf_upload/*
+!hf_upload/GRAFT_MODEL_CARD.md
+!hf_upload/README.md
+!hf_upload/YAYIN_ADIMLARI.md
+!hf_upload/make_hf_checkpoint.py
+!hf_upload/fix_hf.py
+!hf_upload/hf_release/
+hf_upload/hf_release/*
+!hf_upload/hf_release/README.md
+!hf_upload/hf_release/config.json
+!hf_upload/hf_release/generation_config.json
 *.safetensors
 osf_companion_v22.tex
 COMMIT_STEPS.md
