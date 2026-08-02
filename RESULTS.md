@@ -2285,6 +2285,63 @@ cubic LM-scale line closes and no further small-scale work is justified for it. 
 CUBIC ADVANTAGE, exactly one follow-up is permitted: repeat on the **current** 6-layer
 reference recipe, which requires training fresh twins.
 
+### §36 RESULT — REVERSED. Carrying the cubic state across a boundary *hurts*.
+
+Run 2026-08-02, Kaggle T4, evaluation only (no training). Both twins loaded and
+**verified**: 156/156 tensors matched, 156/156 bit-exact, 0 missing names,
+`out_gain` mean 0.2372 (cubic) / 0.2388 (exp) with std ≈ 0.10 — training trace
+present, so the weights are the trained ones. Grafted layer set read from the
+checkpoints and **identical across twins**: 13 of 28 layers `[1,3,…,25]`,
+324,805 trainable parameters. Raw data: `v36_raw.json`.
+
+Per-token cross-entropy over the first 32 tokens of each 256-token chunk, cache
+reset at every chunk boundary, n = 120 chunks:
+
+| arm | state carried | state reset | **Δ = reset − carried** | Wilcoxon |
+|---|---|---|---|---|
+| `cubic_flux_chunked` | 4.2871 | 4.0054 | **−0.2817** | p = 0.014 |
+| `exp` | 3.9051 | 3.9401 | **+0.0350** | p = 6.0e−05 |
+
+**Power gate: passed**, on the `exp` arm — carrying its state improves prediction
+by 0.0350 nat/token, small but consistent across chunks. Stated plainly: the gate
+was cleared by a **0.035 nat** effect. The state is not inert, but what it carries
+is worth very little.
+
+**Pre-registered verdict: REVERSED.** Δ_cubic − Δ_exp = **−0.3167 nat/token**,
+Wilcoxon z = −5.95, **p = 2.7e−09**, far past the ±0.02 threshold. Per the stopping
+rule, **the cubic LM-scale line closes.**
+
+**The sign is the finding.** This is not "cubic helps less". Cubic's Δ is *negative*
+and significantly so: carrying its recurrent state across a chunk boundary makes
+next-token prediction **0.28 nat/token worse** than discarding it. The state is not
+neutral — it is actively harmful once it crosses a boundary.
+
+**A mechanism that this project already documented.** §27a found that *lengthening*
+cubic's plateau made retention **worse**, because a channel that forgets less
+accumulates more interference. §36 is the same effect at LM scale: cubic's slower
+decay means more of the previous chunk's content survives into a context where it no
+longer applies, and that stale content costs more than it contributes. The
+interference story is consistent from the small-scale sweep to the 1.5B graft.
+
+**What this does to the cubic case.** §29b left one binding un-shelving condition:
+replicate the sparse-regime advantage at LM scale. §36 tested it with the cache
+confound removed — the protocol §15h lacked — and the answer is not "no advantage"
+but "a measurable disadvantage". BEKLEYEN #21 condition #3 is **failed**, not
+merely unmet. §28a's small-scale result stands as recorded (and §29b already
+narrowed its attribution); it does not transfer to this scale in this direction.
+
+**Caveats, recorded rather than buried.**
+- These are the §15f/§15h-era **dense 13-layer** twins (PPL ≈ 1.64× baseline), not
+  the current 6-layer/149,910-param reference. The pre-registration recorded this
+  limitation in advance. Whether a 6-layer graft behaves the same is untested.
+- The twins are not quality-matched (§15h: PPL 13.04 cubic vs 12.87 exp). Within-model
+  differencing removes the level difference, but a lower-quality model could in
+  principle have a worse-conditioned state; that alternative is not excluded here.
+- The endpoint is first-32-token CE under 256-token chunking. Other chunk sizes and
+  windows are untested.
+- Single run, single seed per arm (the twins are the seeds available). The n = 120 is
+  chunks, not independent training runs.
+
 ## Reproduction
 
 ```bash
