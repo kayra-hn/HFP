@@ -1466,6 +1466,75 @@ gap over exp divided by sequential cubic's gap over exp, primary endpoint):
 another field. Per `AGENTS.md`, that origin is a derivation story and not evidence:
 the claim stands or falls entirely on the measurements in §28a and here.
 
+### §29b RESULT — gate failed as pre-registered; no verdict on `parallel_cubic`
+
+Run 2026-08-01, Kaggle T4, 3 arms × 16 paired seeds, 48 runs, **19 268 s (5.35 h)**,
+zero divergences. Raw per-seed data: `docs/data/parallel_cubic_v29b_n16.json`.
+
+Arm means (nats; chance for the carry target = ln 30 = 3.4012, lower is better):
+
+| arm | `val_cross` (primary) | `val_inchunk` (diagnostic) | `val_loss` (mixed, §28a's metric) |
+|---|---|---|---|
+| `exp` | 3.4571 | 1.9626 | 2.1761 |
+| `cubic_flux_chunked` | 3.1801 | 1.5328 | 1.7681 |
+| `parallel_cubic` | 2.9994 | 1.4720 | 1.6902 |
+
+**Pre-registered verdict: the vehicle-validity gate FAILED.** On the primary
+endpoint, `cubic(sequential) − exp` = **+0.2770 nat**, 14/16 seeds, paired
+t = 1.70, **p = 0.1103**. The gate required p < 0.05, so per the pre-registration
+**no verdict is issued on `parallel_cubic`'s retention.** The retention ratio would
+have been 0.4577/0.2770 = 165%, a fraction with an unstable denominator and
+therefore meaningless.
+
+**Two defects in this section's own pre-registration, recorded rather than repaired
+after the fact.** (i) It said "p < 0.05" without naming the test; the notebook used
+a paired t-test. On the same data the sign test gives p = 0.0042 and Wilcoxon signed-
+rank gives p = 0.0052 — both would have passed. The discrepancy is driven by seed 15
+(cubic 0.586 vs exp 3.251, a +2.66 difference) inflating the variance; excluding it,
+the mean falls to +0.1178 but t = 3.06, p = 0.0084. **The verdict is not revised:
+choosing a test after seeing the result is p-hacking.** (ii) A ratio of two gaps was
+the wrong estimand; a direct non-inferiority contrast between the two cubic forms is
+the right one and is reported below as exploratory. Both defects are fixed in any
+successor pre-registration.
+
+**§28a replicates on its own metric.** `cubic − exp` on the mixed metric is
+**+0.4080 nat, 14/16 seeds, p = 0.0005**, against §28a's +0.484, 13/16, p = 0.0124.
+§28a is confirmed, not overturned.
+
+**But its attribution is corrected.** Decomposing the mixed metric: the effect is
++0.4298 in-chunk (p = 0.0008) and +0.2770 cross-chunk (p_t = 0.1103, SD 0.653 vs
+0.409). Consistency check: at P = 6 the mixed loss averages 7 supervised tokens, 6
+in-chunk, so (6 × 0.4298 + 0.2770)/7 = **0.41** against the observed **+0.4080**. The
+cross-boundary component of cubic's advantage is real but **smaller and considerably
+noisier** than the mixed metric implies. §28a's framing as a *carry* result overstates
+the cross-boundary part.
+
+**Exploratory analyses (NOT pre-registered; descriptive only).**
+
+1. `parallel_cubic − exp` on the primary endpoint: **+0.4577 nat, 14/16 seeds**,
+   paired t p = 0.0083, sign p = 0.0042, Wilcoxon p = 0.0009 — all three concordant.
+2. `parallel_cubic − cubic(sequential)`: cross +0.1807 (p_t 0.46), mixed +0.0779
+   (0.44), in-chunk +0.0608 (0.59). **The two cubic forms are statistically
+   indistinguishable on every metric.** This is the question §29 actually wanted
+   answered, and the block-frozen approximation costs nothing measurable here. It is
+   not, however, a pre-registered non-inferiority test with a stated margin.
+3. The seed distribution is **bimodal, and the means conceal it.** Sorted `val_cross`:
+   `exp` spans 3.25–3.65 and **never falls below 3.25 in any of 16 seeds**;
+   `cubic` reaches below 3.0 once (0.59); `parallel_cubic` five times (1.35, 2.43,
+   2.50, 2.56, 2.90). The pattern is not "slightly better on average" but "sometimes
+   solves the task, while exp never does". The <3.0 threshold was chosen after seeing
+   the data; the threshold-free statement is that `exp`'s best seed is worse than
+   `parallel_cubic`'s fifth-best.
+
+**What this does and does not establish.** It does not un-shelve cubic: the
+pre-registered gate failed and no verdict was issued. It does establish, descriptively,
+that the parallel form costs nothing measurable relative to the sequential form, which
+is the engineering objection that put cubic on the shelf (BEKLEYEN #21, conditions #1
+and #2). Condition #3 — replication of the sparse-regime advantage at LM scale — remains
+untouched and is the binding constraint. A confirmatory small-scale re-run with a
+properly specified non-inferiority test would cost another ~5.3 h and would not address
+condition #3; that trade is a decision for the author, not an automatic next step.
+
 ## 30. Memory-organ capability test (pre-registered)
 
 Everything in the "memory co-processor" product framing rests on a capability that
