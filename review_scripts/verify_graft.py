@@ -52,20 +52,76 @@ from hfp.models.grafting import (
 )
 
 
-def load_checkpoint_safe(model: nn.Module, state_dict: dict):
-    """Safely load state_dict into model with strict=False and verify non-zero matching tensors.
-    
+def load_checkpoint_safe(
+    model: nn.Module,
+    state_dict: dict,
+    check_param_name: str = None,
+    expected_init_val: float = None,
+):
+    """Safely load state_dict into model with strict=False and verify:
+      1. Name matching (matched keys count > 0)
+      2. Shape matching for all matched keys
+      3. Bit-for-bit value transfer verification (torch.equal) after loading
+      4. Optional training trace check (verify parameter has moved from initial value)
+
     Returns (num_matched, missing_keys, unexpected_keys).
-    Raises ValueError if 0 tensors were matched.
+    Raises ValueError on any safety verification failure.
     """
-    m_keys = set(model.state_dict().keys())
+    m_sd = model.state_dict()
+    m_keys = set(m_sd.keys())
     s_keys = set(state_dict.keys())
     matched_keys = m_keys.intersection(s_keys)
-    res = model.load_state_dict(state_dict, strict=False)
+
+    # 1. Isim eslesmesi kontrolu
     if len(matched_keys) == 0:
         raise ValueError(
-            f"Checkpoint loading failed: 0 matching tensors found between state_dict ({len(s_keys)} keys) and model ({len(m_keys)} keys)."
+            f"Checkpoint loading failed: 0 matching tensor names found between state_dict ({len(s_keys)} keys) and model ({len(m_keys)} keys)."
         )
+
+    # 2. Sekil (shape) uyuşmazlığı kontrolü
+    shape_mismatches = []
+    for k in matched_keys:
+        if m_sd[k].shape != state_dict[k].shape:
+            shape_mismatches.append((k, tuple(m_sd[k].shape), tuple(state_dict[k].shape)))
+
+    if len(shape_mismatches) > 0:
+        raise ValueError(
+            f"Checkpoint loading failed: Shape mismatch found for {len(shape_mismatches)} tensors. Examples: {shape_mismatches[:3]}"
+        )
+
+    # State dict yukleme
+    res = model.load_state_dict(state_dict, strict=False)
+
+    # 3. Bit-bit deger dogrulamasi (torch.equal)
+    m_sd_after = model.state_dict()
+    failed_transfers = []
+    for k in matched_keys:
+        if not torch.equal(m_sd_after[k], state_dict[k]):
+            failed_transfers.append(k)
+
+    if len(failed_transfers) > 0:
+        raise ValueError(
+            f"Checkpoint loading failed: Value transfer verification failed for {len(failed_transfers)} tensors. Examples: {failed_transfers[:3]}"
+        )
+
+    # 4. Opsiyonel egitim-izi (training trace) kontrolu
+    if check_param_name is not None and expected_init_val is not None:
+        matching_params = [
+            (name, param)
+            for name, param in model.named_parameters()
+            if check_param_name in name
+        ]
+        if not matching_params:
+            raise ValueError(
+                f"Training trace check failed: Parameter matching '{check_param_name}' not found in model."
+            )
+        for name, param in matching_params:
+            init_tensor = torch.tensor(expected_init_val, dtype=param.dtype, device=param.device)
+            if torch.allclose(param, init_tensor, atol=1e-5):
+                raise ValueError(
+                    f"Training trace check failed: Parameter '{name}' value is unchanged from init value {expected_init_val} (untrained weights)."
+                )
+
     return len(matched_keys), res.missing_keys, res.unexpected_keys
 
 
@@ -209,20 +265,54 @@ def test_t5_checkpoint_load_safety():
     model = make_dummy_llama(num_layers=4)
     graft_llama(model, GraftConfig(decay_mode="exp", write_rule="additive"), layers=[1])
 
+    # 1. Gecerli checkpoint + bit-bit deger dogrulamasi
     valid_sd = {k: v.clone() for k, v in model.state_dict().items()}
     matched_count, missing, unexpected = load_checkpoint_safe(model, valid_sd)
     assert matched_count > 0, "Valid state_dict must match non-zero tensors"
 
-    corrupted_sd = {f"corrupted_prefix.{k}": v.clone() for k, v in valid_sd.items()}
-    caught = False
+    # 2. Isim eslesmeme hatasi (0 matching tensors)
+    corrupted_names_sd = {f"corrupted_prefix.{k}": v.clone() for k, v in valid_sd.items()}
+    caught_names = False
     try:
-        load_checkpoint_safe(model, corrupted_sd)
+        load_checkpoint_safe(model, corrupted_names_sd)
     except ValueError as e:
-        if "0 matching tensors found" in str(e):
-            caught = True
+        if "0 matching tensor names found" in str(e):
+            caught_names = True
+    assert caught_names, "load_checkpoint_safe must raise ValueError when 0 tensor names match"
 
-    assert caught, "load_checkpoint_safe must raise ValueError when 0 tensors match"
-    print("PASSED")
+    # 3. Sekil (shape) uyuşmazlığı hatası
+    corrupted_shape_sd = {k: v.clone() for k, v in valid_sd.items()}
+    # layers.1.self_attn.log_eta varsayilan 1D tensörünü 2D yaparak şekil hatası üret
+    target_key = "model.layers.1.self_attn.log_eta"
+    corrupted_shape_sd[target_key] = torch.zeros((10, 10))
+    caught_shape = False
+    try:
+        load_checkpoint_safe(model, corrupted_shape_sd)
+    except ValueError as e:
+        if "Shape mismatch found" in str(e):
+            caught_shape = True
+    assert caught_shape, "load_checkpoint_safe must raise ValueError on shape mismatch"
+
+    # 4. Egitim izi (training trace) kontrolu
+    # 4a. Egitimsiz parametre (init degeri ile ayni -> hata vermeli)
+    # out_gain init degeri 1.0
+    init_val = 1.0
+    target_key = "model.layers.1.self_attn.out_gain"
+    caught_trace_untrained = False
+    try:
+        load_checkpoint_safe(model, valid_sd, check_param_name="out_gain", expected_init_val=init_val)
+    except ValueError as e:
+        if "Training trace check failed" in str(e) and "untrained weights" in str(e):
+            caught_trace_untrained = True
+    assert caught_trace_untrained, "load_checkpoint_safe must raise ValueError when checked parameter is unchanged from init"
+
+    # 4b. Egitilmis parametre (init degerinden sapmis -> basariyla gecmeli)
+    trained_sd = {k: v.clone() for k, v in valid_sd.items()}
+    trained_sd[target_key] = torch.full_like(valid_sd[target_key], 0.5)  # 1.0'dan 0.5'e sapmis
+    matched_trained, _, _ = load_checkpoint_safe(model, trained_sd, check_param_name="out_gain", expected_init_val=init_val)
+    assert matched_trained > 0, "Trained parameter check must pass when value has moved from init"
+
+    print("PASSED (name mismatch, shape mismatch, bit-bit verification, training trace tested)")
 
 
 def main():
