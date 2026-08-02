@@ -19,30 +19,46 @@ kasıtlıdır; "temizlenmez". İki ajan daha aynı repoda çalışıyor.
 
 ---
 
-## Geçen turun düzeltilmesi gereken yeri
+## ⚠ BU BÖLÜM GERİ ÇEKİLDİ (2026-08-02) — hata bu brief'i yazandaydı
 
-`docs/internal_tr/DENETIM_2026-08.md` bölüm 1b'de **karşılaştırma çiftleri
-karışmış.** Rapor "`hfp/core` ile `hf_release` arasında yalnız 1 satır kozmetik
-fark" ve "`hfp_utils` bit-bit aynı" diyor. Ölçülen gerçek:
+> **Aşağıdaki iddia YANLIŞTI ve 3. tur görevlerinin bir kısmını gereksiz yere
+> tetikledi. Kayıt için bırakılıyor, uygulanmıyor.**
+>
+> Bu brief, 2. turun `hf_upload` analizini "karşılaştırma çiftleri karışmış"
+> diye işaretledi ve `bulk_trigger_decoder` için 528, `hfp_utils` için 232
+> satır sapma olduğunu iddia etti. **Bu sayılar CRLF/LF artefaktıydı.**
+>
+> `hfp/core/bulk_trigger_decoder.py` ve `hfp/core/hfp_utils.py` **CRLF**,
+> `hf_upload/` kopyaları **LF** satır sonu kullanıyor. `diff` bu durumda bütün
+> dosyayı değişmiş sayar: 264×2 = 528, 116×2 = 232 — tam olarak dosya
+> uzunluğunun iki katı. Ölçen taraf satır sonlarını kontrol etmedi.
+>
+> **Satır sonu normalize edilince gerçek matris (md5 ile de doğrulandı):**
+>
+> ```
+>                      hf_upload↔hfp/core   hf_release↔hfp/core
+> bulk_trigger_decoder        0                    2
+> hfp_utils                   0                    0
+> hfp_bulk_state              0                  210
+> hfp_config                  0                   15
+> ```
+>
+> Yani 2. turun "1 satır kozmetik fark" ve "`hfp_utils` bit-bit aynı" ifadeleri
+> **doğruydu.** GÖREV 1 (raporu düzelt) hatalı bir gerekçeyle verildi; o görevle
+> `DENETIM_2026-08.md`'ye yazılan düzeltme notu **geri alınmalıdır** —
+> doğru bir ifadeyi "düzeltiyor".
+>
+> **Ayakta kalan bulgu:** `hf_release/hfp_bulk_state.py` ve `hfp_config.py`
+> gerçekten 210 ve 15 satır geride. 1. turun `hf_upload/` güncellemesi yayın
+> paketinin iki kopyasını birbirinden ayırdı.
+>
+> **Ve yeni gerçek bulgu:** `hfp/core/` içinde satır sonları karışık
+> (`bulk_trigger_decoder.py`, `hfp_utils.py` CRLF; `hfp_bulk_state.py` LF).
+> Bütün karışıklığın kaynağı bu. `.gitattributes` ile normalize edilmeli.
 
-```
-                     hf_upload↔hfp/core   hf_release↔hfp/core   hf_upload↔hf_release
-bulk_trigger_decoder        528                  528                     2
-hfp_utils                   232                  232                     0
-hfp_bulk_state                0                  210                   210
-hfp_config                    0                  113                   113
-```
-
-Raporda verilen 1 ve 0 sayıları **son sütuna** ait — yani yayın paketinin iki
-kopyasının birbirine benzemesine. Kanonikle senkron hakkında bir şey söylemiyor.
-Gerçek sapma 528 ve 232 satır ve duruyor. **BEKLEYEN #9 kapanmadı.**
-
-Ayrıca birinci turun kopyalaması yeni bir tutarsızlık yarattı: `hf_upload/`'daki
-iki dosya artık `hfp/core` ile aynı, ama `hf_release/` kopyaları 210 ve 113 satır
-farklı. **Yayın paketi kendi içinde tutarsız hâle geldi.**
-
-**Kural:** bir fark rapor ederken **hangi iki yol arasında** olduğunu yaz.
-`A ↔ B: N satır` formatı dışında fark rapor etme.
+**Kural (geçerliliğini koruyor):** bir fark rapor ederken **hangi iki yol
+arasında** olduğunu yaz, ve **satır sonu farkını içerik farkından ayır.**
+`A ↔ B: N satır (satır sonu normalize)` formatı dışında fark rapor etme.
 
 ---
 
