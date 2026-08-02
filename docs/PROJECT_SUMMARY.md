@@ -46,20 +46,21 @@ excellent (MSE ≈ 0.089) while end-to-end quality degrades — localising the l
 A content-adaptive "cubic" decay (λ = 1/√(1+2η·z²), forgetting scaled by channel
 occupancy) versus a fair multi-scale learned-λ exponential control.
 
-*Small scale, synthetic sparse writes:* a pre-registered, paired, 16-seed win —
-**+0.48 nat, 13/16 seeds, p = 0.012**, replicated at **+0.41 nat, 14/16,
-p = 0.0005**. Decomposing that metric, however, places **+0.43 nat in-chunk**
-(p = 0.0008) against only **+0.28 nat cross-chunk** (paired t p = 0.11): the gain
-is mostly within-chunk retention, not carrying across a boundary.
+*Small scale, synthetic sparse writes (§28a, §29b):* a pre-registered, paired,
+16-seed win — **+0.48 nat, 13/16 seeds, p = 0.012**, replicated at **+0.41 nat,
+14/16, p = 0.0005**. Decomposing that metric, however, places **+0.43 nat
+in-chunk** (p = 0.0008) against only **+0.28 nat cross-chunk** (paired t
+p = 0.11): the gain is mostly within-chunk retention, not carrying across a
+boundary.
 
-*LM scale, with the cache confound removed:* the same two controlled graft twins
-were re-evaluated with the KV cache reset at every chunk boundary, so the O(1)
-state is the only cross-boundary channel. Carrying the cubic state then makes
+*LM scale, with the cache confound removed (§36):* the same two controlled graft
+twins were re-evaluated with the KV cache reset at every chunk boundary, so the
+O(1) state is the only cross-boundary channel. Carrying the cubic state then makes
 next-token prediction **0.28 nat/token worse** than discarding it, while the
 exponential arm gains a marginal +0.035 — a paired difference of
-**−0.3167 nat/token, Wilcoxon p = 2.7e−09**. The earlier null in this regime
-(§15h) was measured with the cache present and was therefore largely blind to the
-state.
+**−0.3167 nat/token, Wilcoxon p = 2.7e−09**, n = 120 chunks. The earlier null in
+this regime (§15h) was measured with the cache present and was therefore largely
+blind to the state.
 
 The mechanism is the same in both directions: a decay that forgets less protects
 an unsaturated channel, and for exactly that reason retains stale content longer
