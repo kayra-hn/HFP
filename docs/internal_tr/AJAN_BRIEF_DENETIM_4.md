@@ -119,10 +119,10 @@ yani `RESULTS.md`'deki sayıları yeniden üretmeyebilirsin.
 istiyor, yani zincirin önceki halkası (§3 eğitimi) koşulmamış. Kod sorunu değil,
 **bağımlılık** sorunu — Görev 4'e ait.
 
-**Sahiplik notu:** bu üç dosya `review_scripts/` altında ve normalde 2. ajanın
-diliminde. 2. ajan henüz hiç çalışmadı (ne `docs/drafts/` var ne
-`IDDIA_DENETIMI`), o yüzden bu üçü **bu tur sana devredildi.**
-`review_scripts/` içindeki **diğer** dosyalara dokunma.
+**Sahiplik notu:** önceki brief'ler `review_scripts/`'i ikinci bir ajana
+ayırmıştı; **o ajan hiç başlatılmadı.** Rezervasyon kaldırıldı: `review_scripts/`
+tamamı sende, ama **yalnız Sınıf 1** kapsamında. Bir dosyanın davranışını
+değiştirmek gerekiyorsa Sınıf 3'tür, önerirsin.
 
 ---
 
@@ -167,11 +167,12 @@ yanıltıcı: kırık bir yol ile "önkoşulu koşulmamış" bir yol farklı şe
 | `scripts/`, `reproduce.py`, `review_scripts/verify_graft.py` | **SEN** |
 | `review_scripts/baseline_compare.py`, `lifetime_retention.py`, `interference_eval.py` | **SEN** (bu tur devredildi) |
 | `docs/internal_tr/DENETIM_*.md`, `TEKRARLANABILIRLIK_*.md`, `HF_UPLOAD_ANALIZI.md` | **SEN** |
-| `README.md`, `NASIL_CALISTIRILIR.md` | **SEN** (yalnız Sınıf 1) |
+| `README.md` (iddia metinleri hariç), `NASIL_CALISTIRILIR.md` | **SEN** (yalnız Sınıf 1) |
 | `RESULTS.md` | GPU oturumu — **DOKUNMA**, hata bulursan raporla |
 | `notebooks/` | GPU oturumu — **DOKUNMA** |
-| `review_scripts/` (diğer dosyalar) | 2. ajan — **DOKUNMA** |
-| `docs/` (yukarıda sayılmayanlar) | 2. ajan — **DOKUNMA** |
+| `review_scripts/` (diğer dosyalar) | **SEN** — Sınıf 1 ile sınırlı |
+| `docs/drafts/`, `docs/PROJECT_SUMMARY.md`, `docs/*.tex` | GPU oturumu — **DOKUNMA** |
+| `README.md` iddia metinleri (satır ~69-77, ~120) | GPU oturumu — **DOKUNMA** |
 | `hf_upload/` takipsiz `.py` kopyaları | **dokunma** — yalnız oku |
 
 ## Yapmayacakların
