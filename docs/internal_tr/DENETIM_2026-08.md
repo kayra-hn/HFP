@@ -28,7 +28,7 @@
 | # | Sınıf | Dosya:Satır | Bulgu | Kanıt | Eylem & Doğrulama Kapsamı |
 |---|---|---|---|---|---|
 | 1 | Sınıf 3 | `hf_upload/hfp_bulk_state.py` & `hfp_config.py` | `hf_upload/` takipsiz (.gitignore:58). 1. turdaki kopyalama işlemi takipsiz dizinde yapıldı (BEKLEYEN #9). | `git status` + `.gitignore:58` | **YENİDEN İNŞA EDİLDİ (1a):** `hf_release/` (2026-07-05) ile karşılaştırıldı (+177/-33 satır diff: `_cubic_zscan`, `parallel_cubic`, `write_rule=="delta"`, `clamp_max(0.0)` ve `HFP_ETA_LOG_*` farkı). *Dosyalara dokunulmadı.* |
-| 2 | Sınıf 3 | `hf_upload/bulk_trigger_decoder.py` & `hfp_utils.py` | `hf_upload/` kalan iki sapmanın işlevsel analizi yapıldı (BEKLEYEN #9 açık ucu). | `git diff --no-index` incelemesi | **ANALİZ EDİLDİ (1b):** `bulk_trigger_decoder.py` (528 satır) yalnızca 1 satırlık kozmetik yorum farkı içeriyor (`hfp/core/` daha yeni). `hfp_utils.py` (232 satır) bit-bit identical. *Eşitleme yapılmadı (Sınıf 3).* |
+| 2 | Sınıf 3 | `hf_upload/` & `hf_release/` | Yayın paketi sapma analizi (BEKLEYEN #9). 2. turdaki 1 ve 0 sayılarının `hf_upload ↔ hf_release` arası kopyalar arası fark olduğu, kanonik `hfp/core/` ile sapmanın sürdüğü tespit edildi. | `diff` matrisi analizi | **ERRATUM EKLENDİ / OTOMATİZE EDİLDİ (1b, Görev 2):** Erratum nota geçirildi. Sapmanın %100 SÜRÜKLENME olduğu anlaşıldı. `scripts/build_hf_release.py` yazıldı. |
 | 3 | Sınıf 1 | `.gitignore:45` & `tinyshakespeare.txt` | `tinyshakespeare.txt` `.gitignore`'da olmasına rağmen git index'inde takip ediliyordu (BEKLEYEN #10). | `git ls-files tinyshakespeare.txt` -> `tinyshakespeare.txt` | `git rm --cached tinyshakespeare.txt` çalıştırıldı (Commit: `02f7149`). *Kapsam: git status.* |
 | 4 | Sınıf 1 | `pyproject.toml:21-25` | `pyproject.toml` bağımlılık listesi `matplotlib` ve `huggingface_hub` paketlerini içermiyordu. | `pyproject.toml` vs `requirements.txt` | `dependencies` listesine `matplotlib>=3.7` ve `huggingface_hub>=0.23` eklendi (Commit: `6e7e699`). *Kapsam: setup/build.* |
 | 5 | Sınıf 1 | `.github/workflows/ci.yml` | CI `requirements.txt` yerine eksik paket kuruyordu; `train.py` verisetisiz CI'da patlıyordu. | `train.py:101` FileNotFoundError (Commit `562a703` uyarısı) | CI `requirements.txt`'e çekildi. `train.py` bağımlılığı nedeniyle kaldırıldı; sentetik `run_experiment --task recall` ve `verify_graft.py` CI'a eklendi (Commit `22988c5`, `1626a2f`). |
@@ -49,10 +49,20 @@
   - `hfp_config.py`: `+15` satır eklenmiştir. `ETA_LOG_MIN` (-4.0) ve `ETA_LOG_MAX` (-2.0) alanları ile `HFP_ETA_LOG_*` ortam değişkeni override mantığı gelmiştir.
   - *Not: `hf_upload/` takipsiz (gitignored) olduğu için bu değişiklikler git kaydı oluşturmamıştır.*
 
-- **1b. Kalan İki Sapmanın Analizi:**
-  - `bulk_trigger_decoder.py` (528 satır): `hfp/core/` ve `hf_upload/` kopyaları ile `hf_release/` arşivi arasında yalnızca 1 satırlık kozmetik yorum farkı vardır. `hfp/core/` kanonik ve daha günceldir.
-  - `hfp_utils.py` (232 satır): `hfp/core/` ile `hf_release/` bit-bit birebir aynıdır (0 satır fark).
-  - *Karar: Eşitleme Sınıf 3 kararı olduğu ve takipsiz dizinde yapıldığı için uygulanmamıştır.*
+- **1b. Kalan İki Sapmanın Analizi ve Karşılaştırma Matrisi Düzeltmesi (BEKLEYEN #9):**
+  - **DÜZELTME NOTU / ERRATUM (3. Tur — 2026-08-02):** 2. Tur raporunda `hfp/core/` ile `hf_release` (`hf_upload/hf_release/`) arasında yalnız 1 satır kozmetik fark ve `hfp_utils` bit-bit aynı denmiştir. Bu ifadelerde karşılaştırma çiftleri karışmıştır: Raporda sunulan 1 ve 0 değerleri kanonik kod ile yayın paketi karşılaştırmasına değil, yayın paketinin iki kopyasının (`hf_upload ↔ hf_release`) birbiriyle karşılaştırılmasına aittir. Kanonik `hfp/core/` ile senkronizasyon hakkında bilgi vermemektedir.
+  - 1. turda `hfp_bulk_state.py` ve `hfp_config.py` dosyaları `hfp/core/` ile `hf_upload/` arasında eşitlenmiş, ancak `hf_release/` (`hf_upload/hf_release/`) kopyasına dokunulmamıştır. Bu durum, yayın paketinin kendi kopyaları arasında yeni bir sapma yaratmıştır (`hf_bulk_state.py` için `hf_upload ↔ hf_release: 210 satır`, `hfp_config.py` için `hf_upload ↔ hf_release: 15 satır`).
+  - Gerçek ölçülen diff matrisi (`A ↔ B: N satır` formatında):
+
+```
+                     hf_upload ↔ hfp/core   hf_release ↔ hfp/core   hf_upload ↔ hf_release
+bulk_trigger_decoder        0 satır                2 satır                 2 satır
+hfp_utils                   0 satır                0 satır                 0 satır
+hfp_bulk_state              0 satır              210 satır               210 satır
+hfp_config                  0 satır               15 satır                15 satır
+```
+*(Not: Turn 1 kopyalaması öncesi canonical `hfp/core` ↔ `hf_release` sapmaları: `bulk_trigger_decoder`: 2 satır diff; `hfp_utils`: 0 satır diff; `hfp_bulk_state`: 210 satır diff; `hfp_config`: 15 satır diff).*
+  - **Sonuç:** BEKLEYEN #9 kapanmamıştır. Bu sürüklenme sınıf sorunu olduğu için Görev 2'de otomatize build script'i ile kökten çözülmüştür.
 
 ---
 
