@@ -92,3 +92,31 @@ Checklist:
   eklendi; `pyproject.toml` lisans metadatası AGPL-3.0-only. Grafted model
   kartı şablonu: apache-2.0-base + agpl-3.0-adapter. (Ağırlık lisansı nihai
   kararı Kapı 2'de verilecek.)
+
+- **2026-08-01: KV-cache confound teşhis aracı → AYRI REPO, Apache-2.0.**
+  Karar: HFP'nin kendisi **AGPL-3.0 kalır, değişiklik yok.** Confound teşhis
+  aracı HFP'den bağımsız, ayrı bir repoda ve **Apache-2.0** ile yayınlanacak.
+
+  *Gerekçe.* Aracın bütün amacı **başkalarının kendi modellerini denetlemesi**.
+  AGPL, bir denetim aracının şirket içinde koşulmasını fiilen engeller ve
+  aracın amacıyla doğrudan çelişir. Apache-2.0, MIT'e tercih edildi çünkü
+  patent hükmü içeriyor (katkıda bulunanlar sonradan patent iddiası açamaz) —
+  dışarıdan katkı beklenen bir araçta bu koruma anlamlı.
+
+  *Dayanak.* Bu rehberin kendi ilkesi: telif sahibi kendi lisansıyla bağlı
+  değildir. Projeye bugüne kadar **hiç dış katkı alınmadı** (CLA'sız merge yok),
+  telif %100 Kayrahan Yılmaz'da. Dolayısıyla kendi kodunu yeni bir repoda farklı
+  lisansla yayınlama hakkı var.
+
+  *Bağlayıcı kısıtlar (araç yazılırken uyulacak).*
+  1. **Dış kod kontrolü:** araca giren hiçbir satır başka bir projeden
+     kopyalanmış olmayacak. DPFP (Schlag) ve delta kuralı (DeltaNet) bu projede
+     *fikir* olarak alıntı; kod olarak kopyalanmadığı teyit edilecek.
+  2. **HFP'nin yayınlanmamış mimari detayları araca girmez** — özellikle
+     `cubic_flux` içselleri. Gerekçe: Kapı 3, patent zamanlamasını cubic
+     mekanizmasına özel işaretliyor ve yayınlanan her şey prior art olur.
+     Confound protokolü zaten bilinçli olarak yayınlanıyor, o kapsam dışı.
+  3. HFP reposu araca **işaret eder**; araç HFP'ye bağımlı olmaz.
+
+  *Etkilenmeyen:* HFP kod lisansı (AGPL-3.0-only), ağırlık lisansı kararı
+  (hâlâ Kapı 2'de açık), CLA.
