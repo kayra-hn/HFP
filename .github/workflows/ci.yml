@@ -35,10 +35,12 @@ jobs:
       - name: Verification suite (chunk-consistency, causal, cubic exactness)
         run: python review_scripts/verify_claims.py
 
-      - name: CLI Entrypoints Dry-Run (train.py & run_experiment.py)
-        run: |
-          python train.py --max_iters 2
-          python run_experiment.py --task recall --steps 2
+      # DIKKAT: train.py CI'da KOSULAMAZ. train.py:101-103 tinyshakespeare.txt
+      # yoksa FileNotFoundError firlatiyor, ve o dosya .gitignore:45'te (BEKLEYEN
+      # #10 ile git indexinden de cikarildi) -> temiz checkout'ta dosya YOK.
+      # run_experiment --task recall sentetik: ag ya da dosya erisimi yok.
+      - name: CLI entrypoint dry-run (yalniz recall; veri/ag gerektirmez)
+        run: python run_experiment.py --task recall --steps 2
 
       - name: Byte-compile all sources (no syntax errors / merge markers)
         run: |
