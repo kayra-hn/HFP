@@ -73,6 +73,23 @@ class HFPPreTrainedModel(PreTrainedModel):
                     module.bias.data.zero_()
         elif isinstance(module, nn.Embedding):
             module.weight.data.normal_(mean=0.0, std=0.02)
+
+class HFPPreTrainedModel(PreTrainedModel):
+    config_class = HFPConfig
+    base_model_prefix = "hfp"
+    _supports_cache_class = False
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            module.weight.data.normal_(mean=0.0, std=0.02)
+            if module.bias is not None:
+                # importance_gate bias'i bilerek -2.0 (gate-collapse onlemi); ezme.
+                if torch.all(module.bias.data == -2.0):
+                    pass
+                else:
+                    module.bias.data.zero_()
+        elif isinstance(module, nn.Embedding):
+            module.weight.data.normal_(mean=0.0, std=0.02)
             if module.padding_idx is not None:
                 module.weight.data[module.padding_idx].zero_()
         elif isinstance(module, nn.LayerNorm):
@@ -80,6 +97,11 @@ class HFPPreTrainedModel(PreTrainedModel):
             module.weight.data.fill_(1.0)
 
 class HFPModel(HFPPreTrainedModel):
+    """Base HFP Transformer model with per-layer recurrent memory (M, z).
+
+    `past_key_values` per layer is a 7-element tuple:
+      (short_memory, M, z, token_count, short_len_dynamic, write_idx, conv_state)
+    """
     def __init__(self, config):
         super().__init__(config)
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
