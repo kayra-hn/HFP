@@ -84,3 +84,6 @@ _commit_msg.txt
 
 # Local archive (not for the public repo)
 _arsiv/
+
+# build_hf_release.py ciktisi (uretilebilir, repoya girmez)
+dist/
