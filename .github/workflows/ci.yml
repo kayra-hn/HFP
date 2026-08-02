@@ -35,6 +35,9 @@ jobs:
       - name: Verification suite (chunk-consistency, causal, cubic exactness)
         run: python review_scripts/verify_claims.py
 
+      - name: Grafting verification suite (graft_llama, streaming, reset_streaming, modes)
+        run: python review_scripts/verify_graft.py
+
       # DIKKAT: train.py CI'da KOSULAMAZ. train.py:101-103 tinyshakespeare.txt
       # yoksa FileNotFoundError firlatiyor, ve o dosya .gitignore:45'te (BEKLEYEN
       # #10 ile git indexinden de cikarildi) -> temiz checkout'ta dosya YOK.
