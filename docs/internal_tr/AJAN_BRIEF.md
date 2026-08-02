@@ -1,5 +1,23 @@
 # Ajan brifingi — bağımsız confound teşhis aracı + HFP yayın hattı
 
+> ## ⏸ PARK EDİLDİ — 2026-08-02
+>
+> Kullanıcı bu hattı **~2 hafta ertelemeye** karar verdi; kendisi ilgilenecek.
+> İptal değil. Başlatmadan önce aşağıdakileri bil:
+>
+> - **Bu ajan hiç başlatılmadı.** Brief'teki "2. ajan" dilim rezervasyonları
+>   diğer brief'lerden **kaldırıldı**; yeniden başlatılırsa sahiplik tablosu
+>   o günkü duruma göre yeniden yazılmalı.
+> - **Görev B (confound yazısı) ve Görev C (iddia denetimi) bu brief'ten
+>   ÇIKARILDI.** İkisi de Sınıf 2 iş — her satır `RESULTS.md`'ye karşı yargı
+>   gerektiriyor — ve GPU oturumuna devredildi. Bu brief yeniden açılırsa
+>   **yalnız Görev A (araç)** geçerlidir.
+> - `C:\Users\yilma\Documents\cache-audit` **oluşturuldu**: Apache-2.0
+>   `LICENSE` + `NOTICE` + iskelet `README.md`, tek commit (`7dd4665`).
+>   GitHub remote'u **yok**. Durum notu: `cache-audit/DURUM.md`.
+> - Lisans kararı ve bağlayıcı kısıtlar: `LISANS_KARAR_REHBERI.md`
+>   karar defteri, 2026-08-01 kaydı. **Değişmedi, geçerli.**
+
 *İkinci ajana verilecek görev tanımı. GPU oturumu paralel olarak §36'yı koşuyor.
 Hazırlanma: 2026-08-01, HFP repo HEAD `2742dcd`.*
 
