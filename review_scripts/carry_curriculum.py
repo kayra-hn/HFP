@@ -164,7 +164,7 @@ if os.path.exists(CKPT):
     st = torch.load(CKPT, weights_only=False, map_location=DEV)
     model.load_state_dict(st["m"]); opt.load_state_dict(st["o"]); sch.load_state_dict(st["s"])
     start = st["step"]
-    random.setstate(st["rng"]); np.random.set_state(st["nprng"]); torch.set_rng_state(st["trng"])
+    random.setstate(st["rng"]); np.random.set_state(st["nprng"]); torch.set_rng_state(st["trng"].cpu())
     print(f"[{TAG}] resume @ {start}")
 
 BS = int(os.environ.get("CC_BS", "8"))

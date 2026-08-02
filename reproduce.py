@@ -62,7 +62,8 @@ REPRODUCE_SECTIONS = [
         "title": "The memory is interference-limited, not decay-limited",
         "cmd": [sys.executable, "review_scripts/interference_eval.py", "0"],
         "env": {},
-        "depends_on": 3,  # Needs lg_0_final.pt from §3
+        "depends_on": 3,
+        "requires_file": os.path.join(REPO_ROOT, "checkpoints", "lg_0_final.pt"),
     },
     {
         "sec": 5,
@@ -129,7 +130,7 @@ REPRODUCE_SECTIONS = [
     {
         "sec": 16,
         "title": "K1 gate, clean re-run: GLA family baseline v2",
-        "cmd": [sys.executable, "review_scripts/baseline_compare.py", "exp", "0", "1.0"],
+        "cmd": [sys.executable, "review_scripts/baseline_compare.py", "0", "1.0"],
         "env": {},
     },
     {
@@ -190,10 +191,31 @@ def list_sections():
     print("-" * 80)
 
 
-def run_section(sec_dict: dict):
+def run_section(sec_dict: dict, with_deps: bool = False):
     sec_num = sec_dict["sec"]
     title = sec_dict["title"]
     cmd = sec_dict["cmd"]
+
+    # Önkoşul dosya kontrolü
+    req_file = sec_dict.get("requires_file")
+    if req_file and not os.path.exists(req_file):
+        if with_deps and "depends_on" in sec_dict:
+            dep_sec = sec_dict["depends_on"]
+            dep_dict = next((x for x in REPRODUCE_SECTIONS if x["sec"] == dep_sec), None)
+            if dep_dict:
+                print(f"  [ÖN KOŞUL] §{sec_num} için §{dep_sec} önkoşul eğitimi koşturuluyor...", flush=True)
+                run_section(dep_dict, with_deps=True)
+
+        if not os.path.exists(req_file):
+            return {
+                "sec": sec_num,
+                "title": title,
+                "cmd": " ".join([os.path.basename(cmd[0])] + cmd[1:]),
+                "status": "ATLANDI-ONKOSUL",
+                "exit_code": 0,
+                "time": 0.0,
+                "stderr": f"Gerekli önkoşul dosyası yok: {os.path.basename(req_file)} (§{sec_dict.get('depends_on')} eğitimi gerekir)",
+            }
 
     env = os.environ.copy()
     env["PYTHONPATH"] = REPO_ROOT
@@ -246,6 +268,7 @@ def main():
     parser.add_argument("--section", type=int, default=None, help="Yalnızca belirli bir bölümü koşturur (ör. --section 3)")
     parser.add_argument("--list", action="store_true", help="Tüm KOŞULABİLİR bölümleri ve komutları listeler")
     parser.add_argument("--heavy", action="store_true", help="120sn+ zamanaşımına uğrayan ağır CPU bölümlerini (§6, §26, §27) de çalıştırır")
+    parser.add_argument("--with-deps", action="store_true", help="Eksik önkoşul dosyaları için bağımlı önkoşul komutlarını da sırayla çalıştırır")
     args = parser.parse_args()
 
     if args.list:
@@ -254,7 +277,6 @@ def main():
 
     targets = REPRODUCE_SECTIONS
     if not args.heavy and args.section is None:
-        # Ağır CPU bölümlerini varsayılan koşudan çıkar
         targets = [s for s in REPRODUCE_SECTIONS if s["sec"] not in (6, 26, 27)]
 
     if args.section is not None:
@@ -271,40 +293,31 @@ def main():
     results = []
     total_t0 = time.time()
     for sdict in targets:
-        # Dependency check (e.g. §4 needs §3 output)
-        if "depends_on" in sdict and args.section == sdict["sec"]:
-            dep_sec = sdict["depends_on"]
-            dep_dict = next((x for x in REPRODUCE_SECTIONS if x["sec"] == dep_sec), None)
-            if dep_dict:
-                print(f"  [ÖN KOŞUL] §{sec_num} için §{dep_sec} bağımlılığı koşturuluyor...", flush=True)
-                run_section(dep_dict)
-
-        res = run_section(sdict)
+        res = run_section(sdict, with_deps=args.with_deps)
         results.append(res)
-        status_str = f"[{res['status']}]" if res["status"] == "PASS" else f"[{res['status']} code={res['exit_code']}]"
-        print(f"  §{res['sec']:<2} | {res['title'][:40]:<40} | {status_str:<12} | {res['time']:.2f}s", flush=True)
+        status_str = f"[{res['status']}]" if res["status"] in ("PASS", "ATLANDI-ONKOSUL") else f"[{res['status']} code={res['exit_code']}]"
+        print(f"  §{res['sec']:<2} | {res['title'][:40]:<40} | {status_str:<16} | {res['time']:.2f}s", flush=True)
 
     total_duration = time.time() - total_t0
 
     print("\n" + "=" * 85, flush=True)
     print("SONUÇ TABLOSU", flush=True)
     print("=" * 85, flush=True)
-    print(f"| {'§':<3} | {'Bölüm Başlığı':<42} | {'Durum':<8} | {'Kod':<4} | {'Süre (sn)':<9} |", flush=True)
-    print("|---|---|---|---|---|", flush=True)
-    pass_count = 0
-    fail_count = 0
+    print(f"| {'§':<3} | {'Bölüm Başlığı':<42} | {'Durum':<16} | {'Kod':<4} | {'Süre (sn)':<9} |", flush=True)
+    print("|---|---|---|---|---|")
+    pass_cnt = sum(1 for r in results if r["status"] == "PASS")
+    fail_cnt = sum(1 for r in results if r["status"] == "FAIL")
+    err_cnt = sum(1 for r in results if r["status"] == "ERROR")
+    skip_cnt = sum(1 for r in results if r["status"] == "ATLANDI-ONKOSUL")
+
     for r in results:
-        if r["status"] == "PASS":
-            pass_count += 1
-        else:
-            fail_count += 1
-        print(f"| §{r['sec']:<2} | {r['title'][:42]:<42} | {r['status']:<8} | {r['exit_code']:<4} | {r['time']:9.2f} |", flush=True)
+        print(f"| §{r['sec']:<2} | {r['title'][:42]:<42} | {r['status']:<16} | {r['exit_code']:<4} | {r['time']:9.2f} |", flush=True)
 
     print("-" * 85, flush=True)
-    print(f"Toplam Süre: {total_duration:.2f} saniye | Başarılı: {pass_count}/{len(results)} | Başarısız: {fail_count}/{len(results)}", flush=True)
+    print(f"Toplam Süre: {total_duration:.2f} sn | PASS: {pass_cnt} | FAIL: {fail_cnt} | ERROR: {err_cnt} | ATLANDI-ONKOSUL: {skip_cnt}", flush=True)
     print("-" * 85, flush=True)
 
-    failures = [r for r in results if r["status"] != "PASS"]
+    failures = [r for r in results if r["status"] in ("FAIL", "ERROR")]
     if failures:
         print("\n" + "!" * 85)
         print("KIRIK YOL RAPORU (Sınıf 2 Değerlendirmesi İçin):")
