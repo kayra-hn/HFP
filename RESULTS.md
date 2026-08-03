@@ -2528,6 +2528,15 @@ comparison: aligned Δ(16) − Δ(2) = −0.0133, identical to the printed value
 No claim is revised on the basis of this analysis; it removes a confound that
 would otherwise have argued *against* the verdict.
 
+**Scope of the defect, stated precisely.** The verdict cell pairs Δ(16) against
+Δ(2) with a tail offset (`off = len(Δ(2)) − n`), which happens to align both to
+*t* = 16…120. **The pre-registered endpoint was therefore never confounded** —
+that is why the aligned recomputation reproduces it exactly. The defect affects
+the *descriptive per-D table* only, and the harm it did was interpretive: the
+non-monotone raw column invited a reading that contradicted the verdict. The
+design should still have fixed a common window explicitly rather than arriving
+at one by accident.
+
 **A second correction, against an earlier reading of my own.** Looking at the raw
 column, `cubic` appears to level off at D = 8 (−0.2202 → −0.2206), and this was
 stated during the run as "cubic saturates". Aligned, it does not: −0.0815 →
@@ -2565,6 +2574,91 @@ figures.** The second check is the stronger one: a signed-rank p-value depends o
 the sign and rank of every paired difference, so it also rules out ordering or
 permutation errors, which a mean comparison cannot detect. If the original
 artefact is ever recovered, it supersedes this file.
+
+## §38 — PRE-REGISTRATION (written 2026-08-03, before the run). Is the state's contribution *content*, or domain priming?
+
+**Why this and not a capacity sweep.** §37 established that carrying the `exp`
+state is worth ~+0.18 nat/token at one chunk and settles at a plateau of ~+0.06.
+The obvious follow-up — enlarge the state and see whether the plateau rises —
+requires changing `dpfp_nu`, which changes `key_dim = 2·D·nu` and therefore the
+shape of the recurrent state. That is not an evaluation, it is a **full retrain of
+the twins**, and it reopens the graft line that §34a closed for memory. It was
+proposed during discussion and is **withdrawn as the next step** on cost grounds.
+
+There is a cheaper and more fundamental question that the existing checkpoints can
+answer. §37 measures *the value of having D chunks of history*. That value has two
+possible sources and §37 cannot separate them:
+
+1. the state carries **content** from those specific chunks, or
+2. the state carries nothing chunk-specific, and the gain is the model **adapting
+   to local domain and style** — any same-domain text would do.
+
+Both produce the same positive Δ. If (2) dominates, the word "memory" is the wrong
+frame for this channel and Faz A is being designed around a misreading. This is
+the same class of confound as §30's KV-cache result: a real measured effect
+attributed to the wrong mechanism.
+
+**Design.** Evaluation only, no training. Same twins, same fingerprint gate and
+mandatory load verification as §36/§37. Same held-out stream, `CHUNK = 256`,
+`HEAD = 32`, `N_CHUNK = 120`, `DynamicCache` reset at every chunk boundary.
+
+Three conditions per measurement chunk *t*:
+
+| condition | history fed before measuring *t* |
+|---|---|
+| **contiguous** | the D chunks immediately preceding *t* (this is §37's condition) |
+| **random** | D chunks drawn from elsewhere in the same stream, excluding a ±D window around *t*, fixed seed, shuffled order |
+| **reset** | none |
+
+The random arm holds constant: amount of history, domain, style, tokenizer
+statistics, and compute. The **only** thing it removes is that the history is the
+actual continuation-relevant context.
+
+`Δ_contig(D) = CE(reset) − CE(contiguous)` (reproduces §37)
+`Δ_random(D) = CE(reset) − CE(random)`
+**`Gap(D) = Δ_contig(D) − Δ_random(D)`** ← the content-specific component
+
+**Common measurement window, fixed in advance.** All D are scored on
+*t* = 16…120, n = 105, for every condition. This is the explicit fix for §37's
+design defect above; it is stated here so it cannot be chosen after seeing data.
+
+**D ∈ {1, 4, 16}.** Trimmed from §37's five values because the third arm roughly
+doubles cost. D = 1 reproduces §37 and serves as the power gate; D = 4 is where
+the plateau begins; D = 16 is the plateau. Estimated ~1.7 h for both models —
+derived from §37's measured 5031 s and forward-pass count, not guessed.
+
+**Power gate.** `exp` Δ_contig(1) must be positive with p < 0.05 and must land
+near §37's aligned +0.1811. If it does not reproduce, the runs are not comparable
+and the result is reported as **inconclusive, not null**.
+
+**Pre-registered criteria** (primary arm `exp`, primary distance **D = 16**, unit
+nat/token, paired Wilcoxon signed-rank, n = 105):
+
+- **CONTENT-CARRYING:** Gap(16) ≥ 0.02 with p < 0.05 → the plateau is genuine
+  chunk-specific memory. Faz A's capacity framing stands and enlarging the state
+  becomes the justified next experiment.
+- **PRIMING-DOMINANT:** Gap(16) ≤ 0.005 → the plateau is not content-specific.
+  The `exp` state is functioning as a domain/style adapter, not a memory. Faz A
+  must be reframed before any architecture work, and §37's plateau must be
+  re-described throughout this document.
+- **INCONCLUSIVE:** anything between 0.005 and 0.02, or Gap ≥ 0.02 with p ≥ 0.05.
+  Reported as inconclusive; no verdict is issued and no claim is revised.
+
+`Δ_random` is reported in its own right: if it is substantially positive, that
+quantifies how much of the apparent memory effect is domain adaptation, which is
+a result whichever way the primary test lands.
+
+**The `cubic` arm** is run identically and reported, but carries no verdict —
+§36/§37 already closed its LM-scale case. It is included because Gap for a
+retention law that *hurts* under accumulation is informative about whether the
+damage is content-driven or generic.
+
+**What this cannot establish.** Gap separates content from priming; it does not
+localise *which* chunk the content came from, and it does not distinguish a full
+channel from steady-state overwrite. Those remain open and are not claimed.
+
+**Stopping rule.** One run, both models, no re-runs on these twins whatever the
+outcome. If the gate fails, Faz A proceeds without this input.
 
 ## Reproduction
 
