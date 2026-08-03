@@ -2560,8 +2560,11 @@ run's values verbatim; the `reset` arrays were derived using the identity
 `reset_D[j] == reset_1[j+D−1]` (the reset arm does not depend on D), which was
 checked exactly against the run's own data. The reconstruction is verified: all
 10 arm-means recomputed from the written file reproduce the run's printed table
-to within 5e−05. If the original artefact is ever recovered, it supersedes this
-file.
+to within 5e−05, **and all 10 Wilcoxon p-values reproduce to three significant
+figures.** The second check is the stronger one: a signed-rank p-value depends on
+the sign and rank of every paired difference, so it also rules out ordering or
+permutation errors, which a mean comparison cannot detect. If the original
+artefact is ever recovered, it supersedes this file.
 
 ## Reproduction
 
