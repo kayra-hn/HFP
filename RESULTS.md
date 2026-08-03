@@ -2295,7 +2295,16 @@ checkpoints and **identical across twins**: 13 of 28 layers `[1,3,…,25]`,
 324,805 trainable parameters. Raw data: `v36_raw.json`.
 
 Per-token cross-entropy over the first 32 tokens of each 256-token chunk, cache
-reset at every chunk boundary, n = 120 chunks:
+reset at every chunk boundary, n = 120 chunks.
+
+> **Clarification added 2026-08-02 (see §37's mid-run correction).** The "state
+> carried" column below means the state accumulated over **every preceding
+> chunk** — `reset_streaming` is called once before the stream and never again,
+> so at measurement chunk *t* the state has absorbed chunks 0…*t*−1. This is
+> unbounded accumulation, **not** a one-chunk carry. An earlier description of
+> this as measuring "a single distance" was wrong. The numbers are unaffected;
+> §37 measures the same quantity as a function of carry length and finds cubic
+> at D = 1 gives **+0.1077**, i.e. short carry helps where accumulation hurts.
 
 | arm | state carried | state reset | **Δ = reset − carried** | Wilcoxon |
 |---|---|---|---|---|
@@ -2390,6 +2399,41 @@ something differs between the runs and the sweep is not comparable.
 **Endpoint.** Mean per-token cross-entropy over the first 32 tokens of the
 measurement chunk, paired by chunk index. **Test specified in advance: Wilcoxon
 signed-rank**, per the §29b lesson.
+
+> ### ⚠ CORRECTION, written mid-run before any verdict (2026-08-02)
+>
+> **The consistency check specified above is void, and the error is in this
+> pre-registration.** It stated that D = 1 reproduces §36's condition and must
+> land near +0.0350 (exp) / −0.2817 (cubic). It does not, and it should never
+> have been expected to.
+>
+> §36's `run(m, carry_state=True)` calls `reset_streaming` **once, before the
+> stream**, and never again. The state therefore accumulates over *every*
+> preceding chunk: at measurement chunk *t* it has absorbed chunks 0…*t*−1, so
+> D = *t*, running from 1 to 120. §36's "carried" condition is **unbounded
+> accumulation**, not a single-chunk carry. §37's D = 1 resets and carries
+> exactly one chunk. The two quantities are different, and comparing them was a
+> mistake made when this section was written, not a defect in the run.
+>
+> **First observed value, recorded before the sweep completed:** cubic at D = 1
+> is **+0.1077** nat/token, against §36's **−0.2817** under unbounded
+> accumulation. Sign and magnitude both differ, which is what the corrected
+> reading predicts rather than contradicts.
+>
+> **Consequences.**
+> - The D = 1 cross-check against §36 is withdrawn. No verdict depended on it;
+>   the sweep's internal comparison (Δ(16) vs Δ(2)) is unaffected and stands as
+>   pre-registered.
+> - §36 is re-read as the **D → stream-length** end of this same sweep, giving a
+>   free additional point rather than a contradiction. Its result section is
+>   annotated accordingly.
+> - The run continues. Stopping it would discard a measurement whose design was
+>   never in question.
+>
+> **What this changes about §36's wording.** §36's write-up describes the
+> contribution as measured "at a single distance". That phrasing is wrong for the
+> same reason: it was measured under accumulation over the whole stream. The
+> numbers stand; the description is corrected here and in §36.
 
 **Power gate.** For the `exp` arm, Δ(1) must be positive with p < 0.05. If the
 state contributes nothing at the shortest distance, there is nothing whose reach
