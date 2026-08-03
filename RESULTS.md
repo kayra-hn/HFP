@@ -2342,6 +2342,90 @@ narrowed its attribution); it does not transfer to this scale in this direction.
 - Single run, single seed per arm (the twins are the seeds available). The n = 120 is
   chunks, not independent training runs.
 
+## 37. How far does the state's contribution reach? (pre-registered)
+
+*Written before the run. Authoritative pre-registration; the notebook markdown is
+a convenience copy.*
+
+**Why this, and why before the from-scratch work.** §36 measured the state's
+contribution at a single distance and found it small but real for `exp`
+(+0.0350 nat/token) and negative for `cubic` (−0.2817). What it did not measure is
+how that contribution behaves as accumulated history grows. That shape determines
+which problem a memory-first architecture actually has to solve, and the two
+possible answers imply different designs:
+
+- **Saturating** — Δ stops growing after a couple of chunks. The channel is full;
+  the binding constraint is **capacity**. Writing better content into it will not
+  help until there is room, and a selective-write objective is the wrong lever.
+- **Growing** — Δ keeps increasing with history. The channel is stable and mostly
+  empty; the binding constraint is **what gets written**. A selective-write
+  objective is then the right lever.
+- **Decaying** — Δ falls with longer carry. Accumulated state becomes net harmful,
+  as `cubic` already does at a single boundary (§36) and as §27a saw at small scale.
+
+§14 provides the prior that motivates asking: with a correctly-trained LM
+configuration it found the degradation over length to be *attention-driven, not
+memory-driven*, with per-position loss flat at 2048 and "no evidence of
+memory-state OOD". That is a single-seed diagnostic and is explicitly not a
+headline claim there, but it is the only positive evidence in the record that the
+state is length-stable, and it has not been followed up.
+
+**Models.** The §15h controlled twins again, evaluation only, no training:
+`checkpoints/graft_run5/hfp_graft_final.pt` (cubic) and
+`checkpoints/graft_run6_exp/hfp_graft_exp_final.pt` (exp). Same fingerprint gate,
+same mandatory load verification, same 13-layer configuration and its caveats as
+recorded in §36.
+
+**Protocol.** Identical streaming setup to §36 — held-out text in 256-token
+chunks, `DynamicCache` reset at every chunk boundary so the recurrent state is the
+only cross-boundary channel. The new variable is **D, the number of chunks the
+state has been carried for** before the measurement chunk:
+
+`Δ(D) = CE(state reset at the measurement chunk) − CE(state carried from D chunks back)`
+
+D ∈ {1, 2, 4, 8, 16}. D = 1 reproduces §36's condition and serves as an internal
+consistency check: it must land near +0.0350 (exp) and −0.2817 (cubic), or
+something differs between the runs and the sweep is not comparable.
+
+**Endpoint.** Mean per-token cross-entropy over the first 32 tokens of the
+measurement chunk, paired by chunk index. **Test specified in advance: Wilcoxon
+signed-rank**, per the §29b lesson.
+
+**Power gate.** For the `exp` arm, Δ(1) must be positive with p < 0.05. If the
+state contributes nothing at the shortest distance, there is nothing whose reach
+can be measured and the sweep is reported as **inconclusive, not null**.
+
+**Pre-registered criteria** (primary arm `exp`; unit throughout is nat/token,
+threshold 0.02 as in §36):
+- **SATURATING:** Δ(16) − Δ(2) < 0.02 → history beyond ~2 chunks adds nothing
+  measurable. Faz A's binding constraint is capacity, and a selective-write
+  objective alone is not expected to help.
+- **GROWING:** Δ(16) − Δ(2) ≥ 0.02 with Wilcoxon p < 0.05 → longer history keeps
+  helping. The channel persists and is under-used; selective write becomes the
+  justified lever.
+- **DECAYING:** Δ(2) − Δ(16) ≥ 0.02 with p < 0.05 → accumulation is net harmful
+  for `exp` as well, not only for `cubic`. That would make interference the
+  dominant effect for both retention laws and would close the "write better
+  content" direction entirely.
+
+The `cubic` arm is run identically and reported, but no separate verdict is issued
+for it: §36 already closed its LM-scale case, and it is included here only to see
+whether its negative contribution deepens with accumulation — which the §27a
+interference account predicts and which would be a mechanistic confirmation rather
+than a new claim.
+
+**What this does not measure.** Δ(D) is the value of *having D chunks of history*,
+not the value of *content from exactly D chunks ago*. Reach and accumulation are
+different quantities and this experiment measures accumulation. A reach measurement
+requires isolating a single distant source, which natural text does not permit
+without a synthetic probe; that is a separate design and is not attempted here.
+
+**Stopping rule.** This is a diagnostic, not a hypothesis test about the
+architecture, and it feeds exactly one decision: which lever Faz A pulls. Whatever
+the outcome, no follow-up run on these twins is justified — the next compute goes
+to Faz A. If the gate fails, Faz A proceeds without this input and the
+selective-write hypothesis stays unresolved.
+
 ## Reproduction
 
 ```bash
