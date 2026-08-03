@@ -317,6 +317,7 @@ def analyze_notebook(nb_path, gitignore_patterns):
             "k3_warnings": [],
             "k4_warnings": [],
             "k4_info": [],
+            "k4_stale_paths_set": set(),
         }
 
     cells = nb_data.get("cells", [])
@@ -330,6 +331,7 @@ def analyze_notebook(nb_path, gitignore_patterns):
     k3_warnings = []
     k4_warnings = []
     k4_info = []
+    k4_stale_paths_set = set()
 
     # --- K3: Kimlik Satırı Eksikliği Kontrolü ---
     if code_cells:
@@ -383,18 +385,17 @@ def analyze_notebook(nb_path, gitignore_patterns):
                     f"[K1 UYARI] Hücre #{cell_idx}:{lineno} Yıldızlı import ('from {mod} import *') ad çözümlemeyi engelliyor."
                 )
 
-        # Modül düzeyindeki yüklenen adları hücrenin o anki sembolleriyle kontrol et
+        # Modül düzeyindeki yüklenen adları kontrol et
         for name, lineno in extractor.module_loaded_names:
             if name not in defined_symbols and not wildcard_imported:
                 k1_errors.append(
                     f"[K1 HATA] Hücre #{cell_idx}:{lineno} Tanımsız ad kullanılıyor (NameError adayı): '{name}'"
                 )
 
-        # Hücredeki tüm yeni tanımlanan sembolleri ekle (modül seviyesi tanımlar dahil)
+        # Hücredeki tüm yeni tanımlanan sembolleri ekle
         defined_symbols.update(extractor.defined)
 
-        # Fonksiyon gövdesi içindeki serbest adları ERTELENMİŞ olarak kontrol et:
-        # Fonksiyon çağrı anında çözüldüğü için, aynı hücrede veya önceki hücrelerde tanımlanmış olması yeterlidir.
+        # Fonksiyon gövdesi içindeki serbest adları ertelenmiş kontrol et
         for name, lineno in extractor.func_loaded_names:
             if name not in defined_symbols and not wildcard_imported:
                 k1_errors.append(
@@ -414,6 +415,7 @@ def analyze_notebook(nb_path, gitignore_patterns):
                         k4_warnings.append(
                             f"[K4 UYARI] Hücre #{cell_idx}:{lineno} Bayat/eksik dosya yolu: '{str_val}'"
                         )
+                        k4_stale_paths_set.add(str_val)
 
     return {
         "path": nb_path,
@@ -423,6 +425,7 @@ def analyze_notebook(nb_path, gitignore_patterns):
         "k3_warnings": k3_warnings,
         "k4_warnings": k4_warnings,
         "k4_info": k4_info,
+        "k4_stale_paths_set": k4_stale_paths_set,
     }
 
 
@@ -452,6 +455,7 @@ def main():
     total_k3 = 0
     total_k4_warn = 0
     total_k4_info = 0
+    all_unique_stale_paths = set()
     nb_with_errors = 0
 
     for nb_path in nb_files:
@@ -475,6 +479,7 @@ def main():
         total_k3 += n_k3
         total_k4_warn += n_k4_w
         total_k4_info += n_k4_i
+        all_unique_stale_paths.update(res["k4_stale_paths_set"])
 
         if n_k1 > 0:
             nb_with_errors += 1
@@ -490,16 +495,20 @@ def main():
             for msg in res["k4_warnings"]:
                 print(f"  {msg}")
 
+    total_all_warning_lines = total_k1 + total_k2 + total_k3 + total_k4_warn + total_k4_info
+
     print("\n" + "=" * 85)
     print("STATİK DENETİM ÖZET TABLOSU")
     print("=" * 85)
-    print(f"Toplam Notebook          : {len(nb_files)}")
-    print(f"Hatalı (K1) Notebook     : {nb_with_errors}")
-    print(f"K1 (NameError / Hata)    : {total_k1}")
-    print(f"K2 (stdout Kazıma Uyarısı): {total_k2}")
-    print(f"K3 (Kimlik Eksik Uyarısı) : {total_k3}")
-    print(f"K4 (Bayat Yol Uyarısı)   : {total_k4_warn}")
-    print(f"K4 (.gitignore Bilgisi)  : {total_k4_info}")
+    print(f"Toplam Notebook                      : {len(nb_files)}")
+    print(f"Hatalı (K1) Notebook                 : {nb_with_errors}")
+    print(f"K1 (NameError / Hata)                : {total_k1}")
+    print(f"K2 (stdout Kazıma Uyarısı)            : {total_k2}")
+    print(f"K3 (Kimlik Eksik Uyarısı)             : {total_k3}")
+    print(f"K4 (Bayat Yol Uyarısı - Satır Bazlı) : {total_k4_warn}")
+    print(f"K4 (Bayat Yol Uyarısı - Tekil Yol)   : {len(all_unique_stale_paths)}")
+    print(f"K4 (.gitignore Checkpoint Bilgisi)   : {total_k4_info}")
+    print(f"Toplam Uyarı Mesaj Satırı (Tüm Kategoriler): {total_all_warning_lines}")
     print("-" * 85)
 
     if args.strict and total_k1 > 0:
