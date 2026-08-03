@@ -15,6 +15,33 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
+UYARI — K4 GUVENILIR DEGIL, SAYISINI KULLANMA (2026-08-03)
+==========================================================
+K1/K2/K3 dogrulandi ve calisiyor. **K4 bozuk.**
+
+K4'un yol cikaricisi f-string'leri ve glob kaliplarini yanlis boluyor. Urettigi
+"tekil yol" listesinde su girdiler var ve hicbiri dosya yolu degil:
+
+    .csv   .json   *.txt   *.json   /**/config.json
+    _log.csv   _valloss.csv   *.safetensors.index.json
+
+Kaynak: f'{CKPT_DIR}/{tag}_log.csv' gibi ifadeler parcalanip her parca ayri bir
+"yol" sayiliyor. Dolayisiyla K4'un "bayat yol" sayisi (bu yazi yazilirken 200
+satir / 49 tekil) ANLAMSIZ -- ne uyarilarin dogru oldugunu ne de sayinin bir
+seyi olctugunu gosteriyor.
+
+Sonuclari:
+- **K4 sayisi hicbir rapora ALINMAZ.** Duzeltilene kadar gostergesel bile degil.
+- **K4 CI'a EKLENMEZ.**
+- Duzeltme yordami: yalnizca ast.Constant string'lerini ve JoinedStr'in TAM
+  birlesimini degerlendir; '/' icermeyen ya da salt uzanti/glob olan parcalari
+  ele. Duzeltmeden sonra sayiyi bir cikti dosyasina yazdir, elle tasima.
+
+Denetim ajani hatti 2026-08-03'te kapatildi; bu is yapilmadan kaldi.
+Bkz. docs/internal_tr/BEKLEYEN_ISLER.md.
+"""
+
+"""
 check_notebooks.py - Notebook statik kontrol betiği (Hücreler-arası bağımlılık ve yol denetleyicisi)
 
 Dört Statik Kontrol:

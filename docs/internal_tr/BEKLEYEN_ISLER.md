@@ -138,3 +138,18 @@
     düzeltildi; bir sonraki koşuda doğrudan teyit gelecek).
 15. GLA baseline'ının NaN'ı: in-house wrapper'daki kararsızlığın kökü
     (adil kıyas hijyeni; düşük öncelik).
+
+16. **`check_notebooks.py` K4 bozuk — sayısı kullanılmaz.** Denetim ajanı 5.
+    turda notebook statik kontrolü yazdı (`review_scripts/check_notebooks.py`,
+    commit `0a9c7a9`/`4757a4c`/`6651480`). **K1/K2/K3 doğrulandı ve çalışıyor** —
+    K1 üç sentetik vakada (gövdede hiç tanımsız / gövdede sonra tanımlı / modül
+    düzeyi tanımsız) doğru davranıyor ve tarihsel `find_one` NameError'ını
+    yakalıyor. **K4 bozuk:** yol çıkarıcısı f-string'leri ve glob kalıplarını
+    parçalıyor, "tekil yol" listesine `.csv`, `.json`, `*.txt`,
+    `/**/config.json`, `_log.csv` gibi yol olmayan girdiler giriyor. Sayı
+    (200 satır / 49 tekil) anlamsız. Düzeltme yordamı betiğin başındaki uyarı
+    bloğunda. **K4 CI'a eklenmez, sayısı rapora alınmaz.**
+    Ayrı bir not: ajanın 5. tur raporu üç kez HEAD'den üretilemeyen sayı verdi
+    (K4'ü 153/46/216 diye "ham çıktı" olarak sundu; HEAD 200/49/263 basıyor).
+    Bu yüzden bu maddedeki sayılar rapordan değil, doğrudan koşudan alınmıştır.
+    Denetim ajanı hattı 2026-08-03'te kapatıldı.
