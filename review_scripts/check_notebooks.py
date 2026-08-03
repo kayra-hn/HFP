@@ -106,10 +106,11 @@ class SymbolExtractor(ast.NodeVisitor):
 
     def __init__(self):
         self.defined = set()
-        self.loaded_names = []  # list of (name, lineno)
+        self.module_loaded_names = []  # (name, lineno) at module level
+        self.func_loaded_names = []    # (name, lineno) inside function bodies
         self.wildcard_imports = []
-        self.scope_stack = [set()]  # local scope stack
-        self.string_literals = []  # list of (str_val, lineno)
+        self.scope_stack = [set()]     # local scope stack
+        self.string_literals = []      # (str_val, lineno)
 
     def current_scope(self):
         return self.scope_stack[-1]
@@ -119,6 +120,9 @@ class SymbolExtractor(ast.NodeVisitor):
             if name in s:
                 return True
         return False
+
+    def in_func_scope(self):
+        return len(self.scope_stack) > 1
 
     def visit_Import(self, node):
         for alias in node.names:
@@ -270,7 +274,10 @@ class SymbolExtractor(ast.NodeVisitor):
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
             if not self.is_in_scope(node.id):
-                self.loaded_names.append((node.id, node.lineno))
+                if self.in_func_scope():
+                    self.func_loaded_names.append((node.id, node.lineno))
+                else:
+                    self.module_loaded_names.append((node.id, node.lineno))
 
     def visit_Constant(self, node):
         if isinstance(node.value, str):
@@ -285,7 +292,6 @@ def is_valid_file_path_candidate(str_val):
     s = str_val.strip()
     if not s or len(s) < 3 or len(s) > 250 or "\n" in s:
         return False
-    # Filtrelenecek protokol ve metin ifadeleri
     ignore_prefixes = ("http://", "https://", "rtsp://", "cuda:", "cpu", "latin-1", "utf-8", "nat/token", "->", ">>>", "==")
     if any(s.startswith(p) for p in ignore_prefixes) or any(p in s for p in ["->", ">>>", "nat/token", "esik:", "YUKLEME"]):
         return False
@@ -377,15 +383,23 @@ def analyze_notebook(nb_path, gitignore_patterns):
                     f"[K1 UYARI] Hücre #{cell_idx}:{lineno} Yıldızlı import ('from {mod} import *') ad çözümlemeyi engelliyor."
                 )
 
-        # K1: Hücrede kullanılan serbest adları önceden tanımlı sembollerle karşılaştır
-        for name, lineno in extractor.loaded_names:
+        # Modül düzeyindeki yüklenen adları hücrenin o anki sembolleriyle kontrol et
+        for name, lineno in extractor.module_loaded_names:
             if name not in defined_symbols and not wildcard_imported:
                 k1_errors.append(
                     f"[K1 HATA] Hücre #{cell_idx}:{lineno} Tanımsız ad kullanılıyor (NameError adayı): '{name}'"
                 )
 
-        # Bu hücrede tanımlanan yeni sembolleri global kümesine ekle
+        # Hücredeki tüm yeni tanımlanan sembolleri ekle (modül seviyesi tanımlar dahil)
         defined_symbols.update(extractor.defined)
+
+        # Fonksiyon gövdesi içindeki serbest adları ERTELENMİŞ olarak kontrol et:
+        # Fonksiyon çağrı anında çözüldüğü için, aynı hücrede veya önceki hücrelerde tanımlanmış olması yeterlidir.
+        for name, lineno in extractor.func_loaded_names:
+            if name not in defined_symbols and not wildcard_imported:
+                k1_errors.append(
+                    f"[K1 HATA] Hücre #{cell_idx}:{lineno} Fonksiyon içinde tanımsız ad kullanılıyor (NameError adayı): '{name}'"
+                )
 
         # --- K4: Sabit Yol / Bayat Referans Kontrolü ---
         for str_val, lineno in extractor.string_literals:
