@@ -77,23 +77,21 @@ ve öyle raporla). Yakalamıyorsa kontrol zayıftır ve öyle yazılır.
 
 ---
 
-## GÖREV 2 — Satır sonu normalizasyonunu TAMAMLA
+## ~~GÖREV 2 — Satır sonu normalizasyonunu TAMAMLA~~ ✅ BİTTİ, YAPMA
 
-4. turda `.gitattributes` eklendi ve `git add --renormalize` koşuldu, ama
-**yalnızca git'in sakladığı düzeldi; çalışma ağacı hâlâ CRLF**:
+**Bu görev artık gerekli değil; GPU oturumu 2026-08-02'de tamamladı.**
 
-```
-hfp/core/bulk_trigger_decoder.py   blob: LF | disk: CRLF
-hfp/core/hfp_utils.py              blob: LF | disk: CRLF
-```
+4. turda `.gitattributes` eklenmiş ve `git add --renormalize` koşulmuştu, ama
+yalnızca git'in sakladığı düzelmişti; çalışma ağacı CRLF kalmıştı. GPU oturumu
+başka bir iş sırasında index'i yeniden kurunca 30 dosya "değişmiş" göründü.
+Kontrol edildi: **30 dosyanın 30'unda içerik farkı sıfır**, fark yalnızca satır
+sonu. `git checkout -- .` ile çalışma ağacı LF'e çekildi.
 
-Yani hayalet diff yerelde aynen tekrarlanabilir — 3. turda bir tur harcatan hata
-buydu.
+Doğrulandı: `hfp/core/*.py`, `pyproject.toml`, `README.md` → LF; `git status`
+temiz; `compileall` ve notebook AST parse'ı geçiyor.
 
-Tamamlaması: `git rm --cached -r . && git reset --hard`. **Bu yıkıcı bir işlem.**
-Önce `git status`'un temiz olduğunu doğrula; temiz değilse **DUR ve raporla**.
-Sonrasında `file hfp/core/bulk_trigger_decoder.py` LF demeli, ve üç bekçi
-(`smoke_test.py`, `verify_claims.py`, `verify_graft.py`) yeşil kalmalı.
+**Yapman gereken tek şey:** raporunda bunu teyit et (`file hfp/core/hfp_utils.py`
+LF demeli). Yeniden normalize etmeye kalkma.
 
 ---
 
