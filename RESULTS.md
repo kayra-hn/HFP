@@ -2553,9 +2553,15 @@ state raises the plateau is a separate, cheap experiment (the same sweep at
 larger `dpfp_nu`) and is the natural prerequisite before Faz A commits to a
 capacity-first design. It is **not** run here and no claim is made about it.
 
-Raw per-chunk values: `v37_raw.json` (Kaggle version output). The aligned
-recomputation was verified against the run's printed table before use —
-all 10 arm-means reproduced to within 5e−05.
+Raw per-chunk values: `v37_raw.json` in the repository root. **Provenance
+note:** the Kaggle version output could not be downloaded directly, so this file
+was **reconstructed** from the run's printed output. The `carried` arrays are the
+run's values verbatim; the `reset` arrays were derived using the identity
+`reset_D[j] == reset_1[j+D−1]` (the reset arm does not depend on D), which was
+checked exactly against the run's own data. The reconstruction is verified: all
+10 arm-means recomputed from the written file reproduce the run's printed table
+to within 5e−05. If the original artefact is ever recovered, it supersedes this
+file.
 
 ## Reproduction
 
