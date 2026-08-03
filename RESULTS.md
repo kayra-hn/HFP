@@ -2470,6 +2470,93 @@ the outcome, no follow-up run on these twins is justified — the next compute g
 to Faz A. If the gate fails, Faz A proceeds without this input and the
 selective-write hypothesis stays unresolved.
 
+### §37 RESULT — SATURATING, as pre-registered. The state's contribution is real, small, and stops growing after ~4 chunks.
+
+Run completed 2026-08-03, 5031 s. **Power gate passed:** `exp` Δ(1) = +0.1895,
+p = 1.41e−06. Sign convention throughout: **Δ > 0 means carrying the state helps**
+(lower cross-entropy than resetting it).
+
+**As printed by the run** (each D uses chunks *t* = D…120, so n = 121 − D):
+
+| D | context carried | exp | cubic |
+|---|---|---|---|
+| 1 | 256 tok | +0.1895 (p=1.4e−06, n=120) | +0.1077 (p=6.4e−05, n=120) |
+| 2 | 512 tok | +0.0743 (p=6.3e−05, n=119) | +0.0137 (p=2.2e−04, n=119) |
+| 4 | 1024 tok | +0.0223 (p=1.6e−04, n=117) | −0.1063 (p=2.2e−03, n=117) |
+| 8 | 2048 tok | +0.0257 (p=8.4e−05, n=113) | −0.2202 (p=1.6e−02, n=113) |
+| 16 | 4096 tok | +0.0617 (p=8.4e−05, n=105) | −0.2206 (p=1.2e−02, n=105) |
+
+**Pre-registered verdict: SATURATING.** Δ(16) − Δ(2) = −0.0133 nat/token
+(n = 105, Wilcoxon p = 5.60e−07), below the 0.02 threshold. History beyond ~2
+chunks adds nothing measurable to `exp`. Faz A's binding constraint is capacity;
+a selective-write objective alone is not the expected lever.
+
+#### Post-hoc sensitivity analysis — a design defect in this pre-registration
+
+**The defect is mine and it is in the design above, not in the run.** The sweep
+lets the measurement chunk set change with D: the loop runs *t* = D…120, so
+D = 16 never measures the first fifteen chunks of the stream that D = 1 measures.
+Δ(D) therefore mixes the effect of carry length with the effect of *which chunks
+were scored*. The pre-registration did not fix a common measurement window, and
+it should have.
+
+This matters because the raw `exp` column is **not monotone**: it falls to
++0.0223 at D = 4 and then *rises* to +0.0617 at D = 16. Read naively that says
+long history starts helping again, which would contradict the verdict.
+
+The raw values are sufficient to settle it without new compute. Recomputing every
+D on the **identical** window *t* = 16…120 (n = 105 for all D; the `reset` arm is
+independent of D, verified exactly: `reset_D[j] == reset_1[j+D−1]`):
+
+| D | exp raw | **exp aligned** | cubic raw | **cubic aligned** |
+|---|---|---|---|---|
+| 1 | +0.1895 | **+0.1811** | +0.1077 | **+0.1125** |
+| 2 | +0.0743 | **+0.0750** | +0.0137 | **+0.0299** |
+| 4 | +0.0223 | **+0.0601** | −0.1063 | **−0.0815** |
+| 8 | +0.0257 | **+0.0669** | −0.2202 | **−0.1680** |
+| 16 | +0.0617 | **+0.0617** | −0.2206 | **−0.2206** |
+
+**The rise disappears.** Aligned, `exp` drops from +0.1811 to a plateau and then
+stays there: Δ(8) − Δ(4) = +0.0068, Δ(16) − Δ(8) = −0.0052, Δ(16) − Δ(4) =
++0.0016. All three are statistically resolvable (p ≤ 6e−04) and all three are an
+order of magnitude below the 0.02 threshold — i.e. detectably non-zero and
+practically flat. The apparent U-shape was a sampling artefact of the moving
+window.
+
+**The pre-registered verdict is unchanged**, and is now supported by a cleaner
+comparison: aligned Δ(16) − Δ(2) = −0.0133, identical to the printed value.
+No claim is revised on the basis of this analysis; it removes a confound that
+would otherwise have argued *against* the verdict.
+
+**A second correction, against an earlier reading of my own.** Looking at the raw
+column, `cubic` appears to level off at D = 8 (−0.2202 → −0.2206), and this was
+stated during the run as "cubic saturates". Aligned, it does not: −0.0815 →
+−0.1680 → −0.2206, still declining at D = 16 with no sign of a floor. `cubic`'s
+damage keeps deepening with accumulation, which is what the §27a interference
+account predicts and what §36's −0.2817 at stream length is consistent with. The
+"cubic saturates" reading was the same artefact and is withdrawn.
+
+#### What the two arms now say together
+
+`exp` is positive at **every** D and never crosses zero; `cubic` crosses between
+D = 2 and D = 4 and keeps falling. The contrast is not "does an O(1) state carry
+anything" — it does — but that the two retention laws differ in whether
+accumulation is survivable. This is the first positive, quantified memory number
+in this project: under `exp`, carrying state is worth ~+0.18 nat/token at one
+chunk and settles at a **plateau of ~+0.06 nat/token** that further history does
+not raise.
+
+**What this does not establish.** Saturation is consistent with a full channel,
+but this experiment cannot distinguish "capacity exhausted" from "writes
+overwrite at a steady-state rate" — both produce a plateau. Whether a larger
+state raises the plateau is a separate, cheap experiment (the same sweep at
+larger `dpfp_nu`) and is the natural prerequisite before Faz A commits to a
+capacity-first design. It is **not** run here and no claim is made about it.
+
+Raw per-chunk values: `v37_raw.json` (Kaggle version output). The aligned
+recomputation was verified against the run's printed table before use —
+all 10 arm-means reproduced to within 5e−05.
+
 ## Reproduction
 
 ```bash
